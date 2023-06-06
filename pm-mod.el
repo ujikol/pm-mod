@@ -1812,7 +1812,7 @@ foreach ($it in $olds) { if ($news -notcontains $it) { Remove-Team%sUser -GroupI
 (defun pm--update-channels(channels)
   (if channels
       (let ((data
-             (-unzip
+             (-unzip-lists
               (--map
                (let* ((name (nth 0 it))
                       (options (nth 1 it))
