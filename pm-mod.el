@@ -366,7 +366,7 @@ If nil org-agenda-files are handled the normal org-way.")
       (add-to-list 'org-export-filter-body-functions 'pm-html-filter-people-links)
       (setq org-html-format-headline-function 'pm-html-format-headline-function)
       (setq org-html-format-inlinetask-function 'pm--html-format-inlinetask-function)
-      (add-hook 'org-export-before-processing-hook 'pm--remove-action-links)
+      (add-hook 'org-export-before-processing-functions 'pm--remove-action-links)
       (advice-add 'org-html--format-toc-headline :around #'pm-html--format-toc-headline))
 
     (when pm-mnemonic-key-bindings
@@ -479,7 +479,7 @@ If nil org-agenda-files are handled the normal org-way.")
         org-display-custom-times t
         org-time-stamp-custom-formats '("<%Y-%m-%d>" . "<%Y-%m-%d %H:%M(%z)>"))
   (setq initial-major-mode 'org-mode)
-  (setq org-show-context-detail
+  (setq org-fold-show-context-detail
         '((default . ancestors)))
   ;;      '((agenda . canonical) ; lineage has a bug not showing direct parent of inlinetask
   ;;        (bookmark-jump . lineage)
@@ -733,7 +733,7 @@ You should install the font Iosevka Term for a nicer appearance:
 (defun pm-focus ()
   (interactive)
   (let ((points (list (point))))
-    (org-show-all '(headings))
+    (org-fold-show-all '(headings))
     (condition-case nil
         (while t
           (org-up-element)
@@ -743,6 +743,15 @@ You should install the font Iosevka Term for a nicer appearance:
     (--each points
       (goto-char it)
       (funcall-interactively #'org-cycle))))
+
+(require 'counsel)
+(defun pm-open-externally (path)
+  (counsel-locate-action-extern path))
+;;  (cond ((eq system-type 'windows-nt) 
+;;         (shell-command (concat "start \"\" " (shell-quote-argument (ct-conv-path path t))))) 
+;;        ((equal (getenv "CT_CONTEXT") "WSL") 
+;;         (shell-command (concat (executable-find "explorer.exe") " " (shell-quote-argument (ct-conv-path path t)))))))
+
 ;;;; Files hierarchy
 
 (defun org-entry-get-recursively-advice (oldfun pom property &optional inherit literal-nil)
@@ -779,7 +788,6 @@ You should install the font Iosevka Term for a nicer appearance:
   (minibuffer-with-setup-hook 'pm-minibuffer-mode
     (org-set-tags (read-from-minibuffer "Tags/Actors:\n" (org-make-tag-string (org-get-tags nil t))))))
 
-(defun pm-schedule-remove () (interactive) (org-schedule `(4)))
 (defun pm-schedule-remove () (interactive) (org-deadline `(4)))
 
 ;;;;; Inline tasks
@@ -850,7 +858,7 @@ This function is meant to be used in `org-cycle-hook'."
       (delete-char 1)
       (save-excursion
         (search-forward-regexp (org-inlinetask-outline-regexp))
-        (previous-line)
+        (forward-line -1)
         (if (looking-at-p "[[:space:]]*$")
             (delete-char 1))))
     (let ((id (pm-new-action-id)))
@@ -867,7 +875,7 @@ This function is meant to be used in `org-cycle-hook'."
              (beginning-of-line)
              (delete-char demote)
              (org-inlinetask-goto-end)
-             (previous-line)
+             (forward-line -1)
              (kill-whole-line)))
           ((and (or (org-at-heading-p) (or (outline-back-to-heading t) t))
                 (or (org-entry-is-todo-p) (org-entry-is-done-p)))
@@ -897,7 +905,7 @@ This function is meant to be used in `org-cycle-hook'."
 ;;(advice-add 'org-html-format-headline-default-function :around #'pm--inlinetask-link-patch-advice)
 
 ;;;; Dates
-(defun pm-read-date-advice (&rest args)
+(defun pm-read-date-advice (&rest _args)
   "Enforce default keybindings even when org-replace-disputed-keys is t
      To be added as advice for org-read-date"
   (define-key org-read-date-minibuffer-local-map (kbd ".")
@@ -1224,7 +1232,9 @@ The point is at the same position as in the original buffer."
 ;;;;; Advanced property macro
 
 (defun pm-get-property (key &optional local search)
-  (org-entry-get nil key (not local)))
+  (org-with-wide-buffer
+   (org-link-search search nil t)
+   (org-entry-get nil key (not local))))
 
 ;;;;; Stakeholders
 
@@ -1482,12 +1492,12 @@ SEPARATOR specifies what string to place between the extracted stakeholders."
   (let ((tags (org-export-get-tags headline info))
         (alltags (org-export-get-tags headline info nil t))
         (parent (org-element-property :parent headline)))
-    (unless (or (seq-contains alltags "_notoc")
-                (and (seq-contains alltags "_notoc1")
-                     (not (seq-contains tags "_notoc1")))
+    (unless (or (seq-contains-p alltags "_notoc")
+                (and (seq-contains-p alltags "_notoc1")
+                     (not (seq-contains-p tags "_notoc1")))
                 (and parent
-                     (seq-contains (org-export-get-tags parent info nil t) "_notoc2")
-                     (not (seq-contains (org-export-get-tags parent info) "_notoc2"))))
+                     (seq-contains-p (org-export-get-tags parent info nil t) "_notoc2")
+                     (not (seq-contains-p (org-export-get-tags parent info) "_notoc2"))))
       (apply orig-fun (list headline info)))))
 
 ;;;;; Context specific settings
@@ -2314,7 +2324,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                   (widen))
                 (org-mark-ring-push)
                 (goto-char destination)
-                (when (or (org-invisible-p) (org-invisible-p2)) (org-show-context 'mark-goto)))
+                (when (or (org-invisible-p) (org-invisible-p2)) (org-fold-show-context 'mark-goto)))
             (user-error "Person not found." link)))
         t))))
    ;; generate task juggler reports
