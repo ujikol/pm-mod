@@ -10,7 +10,11 @@
   "Whether to define mnemonic key bindings.")
 
 (defvar pm-agenda-files-root "~/agenda_files.org"
-  "Path of file to be parsed recursively for file links to org-agenda-files. If nil org-agenda-files are handled the normal org-way.")
+  "Path of file to be parsed recursively for file links to org-agenda-files.
+If nil org-agenda-files are handled the normal org-way.")
+
+(defvar user-match-code nil
+  "Match code (acronym) of user.")
 
 ;;; Basic settings
 
@@ -19,12 +23,14 @@
 
 ;;;; Basic basics
 
-  (unless (boundp 'user-match-code)
-    (setq user-match-code (or (getenv "match_code") user-login-name)))
+  
+  (setq user-match-code (or user-match-code (getenv "match_code") user-login-name))
   
   (with-eval-after-load 'org
     (when pm-agenda-files-root
       (setq org-agenda-files nil))
+    (setq org-archive-tag "_archive")
+    (setq org-element-archive-tag "_archive")
 
 ;;;; Editor
 
@@ -64,9 +70,9 @@
       (global-set-key (kbd "C-M-a") 'org-mark-subtree)
       (global-set-key (kbd "M-<SPC>") 'cua-set-rectangle-mark)
       (global-set-key (kbd "<S-M-SPC>") 'cua-set-mark)
-      (with-eval-after-load 'expand-region
-        (global-set-key (kbd "<C-SPC>") 'er/expand-region)
-        (global-set-key (kbd "<S-C-SPC>") 'er/contract-region))
+      (require 'expand-region)
+      (global-set-key (kbd "<C-SPC>") 'er/expand-region)
+      (global-set-key (kbd "<S-C-SPC>") 'er/contract-region)
 
       (define-key org-mode-map (kbd "C-_") 'org-table-insert-hline)
       (define-key org-mode-map (kbd "M-|") 'org-table-create-or-convert-from-region)
@@ -263,7 +269,8 @@
     (when pm-mnemonic-key-bindings
       (global-set-key (kbd "C-r") 'pm-refile)
       (global-unset-key (kbd "M-r"))
-      (global-set-key (kbd "C-g") 'pm-goto))
+      (global-set-key (kbd "C-g") 'pm-goto)
+      (global-set-key (kbd "M-g") 'goto-line))
     
 ;;;; Agenda
 ;;;;; Agenda files
@@ -272,8 +279,6 @@
       ;; prevents unwanted changes in custom-file e.g. org-agenda-files (not always?)
       ;;(debug-on-variable-change 'org-agenda-files)
       (define-key org-mode-map (kbd "C-c [") nil))
-
-    (pm-load-agenda-files)
 
 ;;;;; Agenda definitions
 
@@ -352,6 +357,7 @@
 
 ;;;; Export
 
+    (require 'ox-html)
     (with-eval-after-load 'ox
       (add-to-list 'org-export-options-alist '(:people-url "PEOPLE_URL" "people" nil t))
       (add-to-list 'org-export-filter-body-functions 'pm-html-filter-people-links)
@@ -383,7 +389,11 @@
     (unless (f-exists? pm-outlook-cmd)
       (setq pm-outlook-cmd "C:/Program Files/Microsoft Office/root/Office16/OUTLOOK.EXE"))
     (unless (f-exists? pm-outlook-cmd)
-      (lwarn 'CT :error "Outlook not found."))
+      (setq pm-outlook-cmd "/mnt/c/Program Files (x86)/Microsoft Office/root/Office16/OUTLOOK.EXE"))
+    (unless (f-exists? pm-outlook-cmd)
+      (setq pm-outlook-cmd "/mnt/c/Program Files/Microsoft Office/root/Office16/OUTLOOK.EXE"))
+    (unless (f-exists? pm-outlook-cmd)
+      (lwarn 'PM :error "Outlook not found."))
 
     (org-link-set-parameters "pm_mail" :follow (lambda (link) (pm-create-outlook-item link 'mail)) :face 'pm-action-face)
     (org-link-set-parameters "pm_meeting" :follow (lambda (link) (pm-create-outlook-item link 'appointment)) :face 'pm-action-face)
@@ -401,6 +411,7 @@
 
 ;;;; Completion
 
+    (require 'company)
     (setq company-backends '(company-capf company-dabbrev company-files))
     (add-hook 'text-mode-hook #'company-mode)
     (add-hook 'org-mode-hook #'pm-company-settings)
@@ -464,7 +475,6 @@
         org-use-sub-superscripts nil
         org-display-custom-times t
         org-time-stamp-custom-formats '("<%Y-%m-%d>" . "<%Y-%m-%d %H:%M(%z)>"))
-  (setq org-archive-tag "_archive")
   (setq initial-major-mode 'org-mode)
   (setq org-show-context-detail
         '((default . ancestors)))
@@ -513,7 +523,7 @@
           ("t" "Task" entry (file+headline org-default-notes-file "Tasks") "* TODO %?\n  %i")
           ("j" "Job" entry (file+headline org-default-notes-file "Tasks") "* JOB %?\n  %i")
           ("m" "Minutes" entry (function (lambda () (switch-to-buffer (buffer-name)) (when (or (not (org-at-heading-p)) (org-inlinetask-at-task-p) (org-inlinetask-in-task-p))  (org-previous-visible-heading 1)))) "* Minutes %(symbol-value 'pm-capture-heading)
-\n** Current [[ctmail:{{{CONTACTS(,email,\";\")}}};{{{team(,email,\";\")}}}&for={{{MAILBOX(,email,\";\")}}}?subject=%(symbol-value 'pm-capture-buffer) - %(symbol-value 'pm-capture-heading) - Minutes&body={{{this}}}][send]] [[ctexport:minutes.html][save]]\n:PROPERTIES:
+\n** Current [[mail:{{{CONTACTS(,email,\";\")}}};{{{team(,email,\";\")}}}&for={{{MAILBOX(,email,\";\")}}}?subject=%(symbol-value 'pm-capture-buffer) - %(symbol-value 'pm-capture-heading) - Minutes&body={{{this}}}][send]] [[pmexport:minutes.html][save]]\n:PROPERTIES:
 :action_id_len: 2
 :EXPORT_OPTIONS: H:3 toc:nil p:t num:3
 :END:\n*** Participants
@@ -565,7 +575,7 @@
   (setq org-modern-hide-stars nil) ; somehow fixes indentation of body
 
 ;;;;; Fonts
-  
+
   (unless (--any? (when (member it (font-family-list))
                     (set-face-attribute 'default nil :family it :height 120 :width 'extra-condensed)
                     (set-face-attribute 'fixed-pitch nil :family it)
@@ -648,19 +658,23 @@
 
 (defun pm-set-context-specific ()
 
-  (setq org-file-apps '(("\\.x?html?\\'" . (lambda (path link) (pm-open-externally path))) 
-                        ("pdf" . default) 
-                        ("docx" . default) 
-                        ("xlsx" . default) 
+  (setq org-file-apps '(("\\.x?html?\\'" . (lambda (path link) (pm-open-externally path)))
+                        ("pdf" . default)
+                        ("docx" . default)
+                        ("xlsx" . default)
+                        (directory . emacs)
                         (auto-mode . emacs)))
-  
+  (when (and (eq system-type 'gnu/linux) (executable-find "wslview"))
+    (setq browse-url-browser-function 'pm-wsl-browse-url))
+
+  (require 'ox-html)
   (setq org-export-exclude-tags '("_noexport"))
 
   ;; Is it really necessary to define a backend to just add a menu entry to the export dispatcher?
   (org-export-define-derived-backend 'pm-html 'html
     :menu-entry '(?h 1 ((?p "As HTML and PDF" pm-export-as-html-and-pdf))))
   
-  (org-link-set-parameters "ctexport" :follow (lambda (link) (pm-export link)) :face 'pm-action-face)
+  (org-link-set-parameters "pmexport" :follow (lambda (link) (pm-export link)) :face 'pm-action-face)
   
   (add-to-list 'org-export-filter-body-functions 'pm-html-filter-sharepoint-warning)
 
@@ -685,6 +699,26 @@ You should install the font Iosevka Term for a nicer appearance:
   )
 
 ;;; Functions
+;;;; WSL
+
+(defun pm-wsl-browse-url (url &rest args)
+  (let ((match (s-match "file:///mnt/\\([a-zA-Z]\\)\\(/.*\\)" url)))
+    (setq url (concat "file:///" (nth 1 match) ":" (nth 2 match))))
+  (shell-command (concat (executable-find "wslview") " " (pm-path url))))
+
+(defun pm-linux-path (path)
+  (and path
+       (let ((match (s-match "^\\([a-zA-Z]\\):\\(/\\|\\\\\\)\\(.*\\)" path)))
+         (if match
+             (concat "/mnt/" (downcase (nth 1 match)) "/" (s-replace "\\" "/" (nth 3 match)))
+           path))))
+
+(defun pm-path (path)
+  "Make path compatible with environment."
+  (cond ((eq system-type 'gnu/linux)
+         (pm-linux-path path))
+        (t path)))
+
 ;;;; Basic functions
 
 (defun pm-delete-line ()
@@ -953,7 +987,7 @@ To avoid this just redefine this function as:
   (message "Adding agenda file %s referred in %s." file referrer)
   (unless (-contains? org-agenda-files file)
     (if (not (f-exists? file))
-        (lwarn 'CT :warn "Missing agenda file %s refered from %s." file referrer)
+        (lwarn 'PM :warn "Missing agenda file %s refered from %s." file referrer)
       (with-current-buffer (find-file-noselect file)
         (org-with-wide-buffer
          (setq org-agenda-files (nconc org-agenda-files(list file)))
@@ -965,7 +999,7 @@ To avoid this just redefine this function as:
                          (s-equals? type "")
                          (s-equals? type "pj"))
                  (let ((tags (pm--collect-ancestors-tags el))
-                       (path (org-element-property :path el)))
+                       (path (pm-path (org-element-property :path el))))
                    (when (not (-contains? tags org-archive-tag))
                      (cond
                       ((s-equals? type "pj")
@@ -1183,6 +1217,13 @@ The point is at the same position as in the original buffer."
     (setq point (point))
     (when (search-forward "\nFdw0BJFB" nil t)
       (buffer-substring-no-properties point (match-beginning 0))))))
+
+;;;;; Advanced property macro
+
+(defun pm-get-property (key &optional local search)
+  (org-entry-get nil key (not local)))
+
+(push `("property" . ,(lambda (key &optional local search &rest _) (pm-get-property key local search))) org-export-global-macros)
 
 ;;;;; Stakeholders
 
@@ -1487,11 +1528,8 @@ SEPARATOR specifies what string to place between the extracted stakeholders."
 
 (defun pm-export (link)
   "Export to html and pdf. To be used for action link."
-  (setq link (string-trim link "\"" "\""))
-  (setq link (pm-expand-string link))
-  (when (equal (getenv "CT_CONTEXT") "WSL")
-    (setq link (pm-conv-path link)))
-  (pm-export-as-html-and-pdf nil t nil nil nil link))
+  (pm-export-as-html-and-pdf nil t nil nil nil
+                             (pm-path (pm-expand-string (string-trim link "\"" "\"")))))
 
 (defun pm--patch-html-for-non-toc (text)
   "Remove toc from html text."
@@ -1531,7 +1569,7 @@ Example:
 (defun pm-project-file (id)
   (let ((fun (nth 1 (pm-project-id-type id))))
     (if fun
-        (funcall fun id)
+        (pm-path (funcall fun id))
       "UNKNOWN_PROJECT_ID_FORMAT")))
 
 (defun pm-project-id ()
@@ -1549,7 +1587,7 @@ Example:
 ;;;; Links and protocol
 (defun pm--link-open-expand-advice (oldfun link &optional arg)
   (let ((link (org-element-copy link)))
-    (org-element-put-property link :path (pm-expand-string (org-element-property :path link)))
+    (org-element-put-property link :path (pm-path (pm-expand-string (org-element-property :path link))))
     (apply oldfun link arg)))
 
 (defun pm-org-invoke-babel-named (name)
@@ -1565,7 +1603,7 @@ org-protocol://ct:/path=c:/path/file.org&search=*Heading"
     (if (plist-get pars :pid)
         (pm-open-project (plist-get pars :pid))
       (let ((default-directory pm-home))
-        (org-open-file (url-unhex-string (plist-get pars :path)))))
+        (org-open-file (pm-path (url-unhex-string (plist-get pars :path))))))
     (org-link-search (url-unhex-string (plist-get pars :search))))
   (raise-frame)
   nil)
@@ -1575,12 +1613,10 @@ org-protocol://ct:/path=c:/path/file.org&search=*Heading"
   "Face for action links."
   :group 'org-faces)
 
-;;(org-link-set-parameters "ctfile" :follow (lambda (link) (pm-open-externally (pm-expand link))))
-;;(org-link-set-parameters "cthtml" :follow (lambda (link) (browse-url (concat "file://" (pm-conv-path (pm-expand link))))))
 (org-link-set-parameters "ctrun" :follow 'pm-org-invoke-babel-named :face 'pm-action-face)
 (add-to-list 'org-protocol-protocol-alist
              '("CoolTool"
-               :protocol "ct"
+               :protocol "pm"
                :function pm-protocol))
 
 ;;;; Interfaces with other apps
@@ -1646,6 +1682,8 @@ if ($myWindowsPrincipal.IsInRole($adminRole)) {
           (to  (lax-plist-get pars "to"))
           (cc  (lax-plist-get pars "cc"))
           (for (lax-plist-get pars "for"))
+          (deadline (lax-plist-get pars "deadline"))
+          (scheduled (lax-plist-get pars "scheduled"))
           setters)
       (when for
         (setq cc (concat for ";" cc)))
@@ -1659,15 +1697,23 @@ if ($myWindowsPrincipal.IsInRole($adminRole)) {
                          (pm--pssavpar sub)))
                (when body
                  (format "$item.%s = %s"
-                         (plist-get '(mail "HtmlBody" appointment "Body") item-type) (pm--pssavpar body)))
+                         (plist-get '(mail "HtmlBody" appointment "Body" task "Body") item-type) (pm--pssavpar body)))
                (when to
                  (format "$item.%s = %s"
-                         (plist-get '(mail "To" appointment "RequiredAttendees") item-type) (pm--pssavpar to)))
+                         (plist-get '(mail "To" appointment "RequiredAttendees" task "Owner") item-type) (pm--pssavpar to)))
                (when cc
                  (format "$item.%s = %s"
                          (plist-get '(mail "Cc" appointment "OptionalAttendees") item-type) (pm--pssavpar cc)))
                (when for
-                 (format "$item.SentOnBehalfOfName = %s" (pm--pssavpar for)))))))
+                 (format "$item.%s = %s"
+                         (plist-get '(mail "SentOnBehalfOfName" appointment "SentOnBehalfOfName" task "Delegator") item-type) (pm--pssavpar for)))
+               (when deadline
+                 (format "$item.DueDate = %s"
+                         (pm--pssavpar deadline)))
+               (when scheduled
+                 (format "$item.ReminderTime = %s"
+                         (pm--pssavpar deadline)))
+               ))))
       (pm-run-in-powershell "
 $ol = New-Object -comObject Outlook.Application
 $item = $ol.CreateItem(%d)
@@ -1677,7 +1723,69 @@ $inspector.Display()
 Start-Sleep -Seconds 2
 $inspector.Activate()
 "
-                            nil (plist-get '(mail 0 appointment 1) item-type) setters))))
+                            nil (plist-get '(mail 0 appointment 1 task 3) item-type) setters))))
+
+(defun pm-create-tasks (&optional up)
+  (setq up (if (org-string-nw-p up) (string-to-number up) 1))
+  (let ((priorities '())
+        outlist
+        headers)
+    (org-with-wide-buffer
+      (org-back-to-heading t)
+      (dotimes (i up)
+        (org-up-element))
+      (save-restriction ; (org-map-entries ... 'tree) does not work here ???
+        (org-narrow-to-subtree)
+        (org-map-entries
+         (lambda ()
+           (let ((state (org-entry-get nil "TODO"))
+                 (priority (org-entry-get nil "PRIORITY"))
+                 (item (org-entry-get nil "ITEM"))
+                 (tags (org-entry-get nil "TAGS"))
+                 (alltags (org-entry-get nil "ALLTAGS"))
+                 (dl (org-entry-get nil "DEADLINE"))
+                 (closing-date (org-entry-get nil "CLOSED"))
+                 id)
+             (setq alltags (if alltags (s-split ":" alltags) '()))
+             (when (and (or (not org-export-select-tags) (not (-intersection org-export-select-tags (-flatten (org-get-buffer-tags)))) (-intersection alltags org-export-select-tags))
+                        (or org-export-exclude-tags (not (-intersection alltags org-export-exclude-tags)))
+                        (or (equal state "TODO")
+                            (equal state "WAITING")
+                            (equal state "QUESTION")
+                            (and (or (equal state "DONE") (equal state "CANCELED"))
+                                 closing-date (>= (org-time-convert-to-integer (org-time-string-to-time closing-date))
+                                                  (org-time-convert-to-integer (org-read-date t t (or recently-done "")))))))
+               (setq id (pm-extract-task-id item))
+               (add-to-list 'outlist
+                            (list 
+                             (cond ((equal state "TODO") '("b" "blue"))
+                                   ((equal state "DONE") '("d" "steelblue"))
+                                   ((equal state "CANCELED") '("e" "grey"))
+                                   ((equal state "WAITING") '("c" "turquoise"))
+                                   ((equal state "QUESTION") '("a" "rosybrown")))
+                             state
+                             priority
+                             (if dl dl "_/*None*/_")
+                             (or (and id (format "@QY@QYhtml:<a href=\"#%s\">#%s</a>@@ %s" id id (substring item (+ (length id) 2)))) item)
+                             (if tags
+                                 (mapconcat 'identity (--filter (s-starts-with? "@" it) (s-split ":" tags)) " ")
+                               "_/*None*/_")))
+               (setq priorities (-union priorities (list priority))))))))
+      (if (not outlist)
+          "No open tasks"
+        (setq outlist (--sort
+                       (string-lessp (concat (caar it) (nth 2 it) (nth 3 it) (nth 4 it))
+                                     (concat (caar other) (nth 2 other) (nth 3 other) (nth 4 other))) outlist))
+        (setq outlist (--map
+                       (cons (format "@QY@QYhtml:<span style=\"color:%s\">%s</span>@@" (cadar it) (cadr it)) (cddr it))
+                       outlist))
+        (if (> (length priorities) 1)
+            (setq headers '("State" "Pri" "Due" "Title" "Actor"))
+          (setq headers '("State" "Due" "Title" "Actor"))
+          (setq outlist (-select-columns '(0 2 3 4) outlist)))
+        (replace-regexp-in-string "@QY@QYhtml:" "@@html:" ; work around orgtbl-to-orgtbl filtering out inline html
+                                  (orgtbl-to-orgtbl (nconc (list headers 'hline) outlist) '())
+                                  t t)))))
 
 (defun pm-outlook-open (link) 
   (shell-command (concat "\"" pm-outlook-cmd "\" outlook:" link)))
@@ -1946,6 +2054,9 @@ foreach ($it in $news) { if ($olds -notcontains $it) { New-TeamChannel -GroupID 
    (pm-element-get-children node 'headline)))
 
 (require 'request)
+(defvar pm-mst-webhook-urlbase nil
+  "URL prefix for MsTeams incoming webhooks")
+
 (defun pm-post-into-channel (link)
   "Post the contents of this branch as message into the MsTeams channel referenced by a web hook ID.
 The web hook ID can be specified as link, or is otherwise taken from the property/keyword MST_Hook."
@@ -1954,20 +2065,19 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                 (save-excursion (org-entry-get nil "MST_Hook"))))
         (msg (replace-regexp-in-string
               "<div id='SharepointWarning'.+\n" ""
-              (org-export-as 'pm-html t nil t)))
-        (urlbase "https://atos365.webhook.office.com/webhookb2/"))
+              (org-export-as 'pm-html t nil t))))
     (unless link
       (user-error "No web hook specified."))
     (request
-      (concat (if (s-prefix? urlbase link t) "" urlbase) link)
+      (concat (if (or (not pm-mst-webhook-urlbase) (s-prefix? urlbase link t)) "" urlbase) link)
       :type "POST"
       :headers '(("Content-Type" . "application/json"))
       :data (json-encode `(("text" . ,msg)))
       :parser 'json-read
       :success (cl-function (lambda (&key data &allow-other-keys) (message "message posted"))))))
 
-(org-link-set-parameters "ct_msteams_team_setup" :follow (lambda (link) (pm-msteams-setup-team-with-structure link)) :face 'pm-action-face)
-(org-link-set-parameters "ctchannelpost" :follow #'pm-post-into-channel :face 'pm-action-face)
+(org-link-set-parameters "pm_msteams_team_setup" :follow (lambda (link) (pm-msteams-setup-team-with-structure link)) :face 'pm-action-face)
+(org-link-set-parameters "pm_channel_post" :follow #'pm-post-into-channel :face 'pm-action-face)
 (setq org-default-properties
       (-concat org-default-properties
                (--map (car it)
@@ -2022,21 +2132,15 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
            (save-excursion
              (widen)
              (goto-char 1)
-             (while (re-search-forward (format "\\(%s\\w*\\)@" arg) nil t)
-               (add-to-list 'cands (match-string 1)))
              (unless (< (length arg) 3)
                (goto-char 1)
-               (while (re-search-forward (format "\\(@\\w\\w+\\)@.+%s" (substring arg 1)) nil t)
-                 (add-to-list 'cands (match-string 1))))))
+               (while (re-search-forward (format "^.*?\\(\\(\\(%s\\w*\\)@\\)\\|\\(\\(@\\w\\w+\\)@.+%s\\)\\).+?$" arg (substring arg 1)) nil t)
+                 (add-to-list 'cands (propertize (concat (match-string-no-properties 3) (match-string-no-properties 5)) 'annotation (match-string 0)))))))
          cands))
       (`annotation
-       (pm-with-minibuffer-selected-window
-         (save-excursion
-           (widen)
-           (goto-char 1)
-           (search-forward (concat arg "@") nil t)
-           (concat (substring "      " (min (length arg) 5))
-                   (buffer-substring-no-properties (line-beginning-position) (line-end-position)))))))))
+       (concat (substring "      " (min (length arg) 5))
+               (get-text-property 0 'annotation arg)))
+      (`sorted t))))
 
 (defun pm-company-settings ()
   (setq-local company-minimum-prefix-length 2)
