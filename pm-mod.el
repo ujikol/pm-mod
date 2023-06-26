@@ -349,7 +349,10 @@ If nil org-agenda-files are handled the normal org-way.")
     
     (advice-add 'org-macro-replace-all :override #'pm-macro-replace-all)
     
-;;;;; Stakeholders
+;;;;; Property
+
+    (push `("property" . ,(lambda (key &optional local search &rest _) (pm-get-property key local search))) org-export-global-macros)
+
 ;;;;; Registers
     (push '("action_plan" . "(eval (pm-action-plan $1 $2))") org-export-global-macros)
     (push '("decisions_log" . "(eval (pm-decisions-log $1))") org-export-global-macros)
@@ -1222,8 +1225,6 @@ The point is at the same position as in the original buffer."
 
 (defun pm-get-property (key &optional local search)
   (org-entry-get nil key (not local)))
-
-(push `("property" . ,(lambda (key &optional local search &rest _) (pm-get-property key local search))) org-export-global-macros)
 
 ;;;;; Stakeholders
 
