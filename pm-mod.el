@@ -1233,7 +1233,8 @@ The point is at the same position as in the original buffer."
 
 (defun pm-get-property (key &optional local search)
   (org-with-wide-buffer
-   (org-link-search search nil t)
+   (when search
+     (org-link-search search nil t))
    (org-entry-get nil key (not local))))
 
 ;;;;; Stakeholders
