@@ -2293,7 +2293,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
 		                  ;; the link.
 		                  (let ((origin (point)))
 		                    (org-with-point-at (org-element-property :end context)
-			                    (skip-chars-backward " \t")
+			                    (skip-chars-backward " \t\n")
 			                    (> (point) origin))))
 	               (org-in-regexp org-ts-regexp-both nil t)
 	               (org-in-regexp org-tsr-regexp-both nil  t)
@@ -2358,23 +2358,37 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
   (let ((context (org-element-context)))
         (cond
          ;; enforce opening links in other window
-         ((eq 'link (org-element-type context))
+         ((and (eq 'link (org-element-type context))
+               ;; Ensure point is not on the white spaces after
+		           ;; the link.
+		           (let ((origin (point)))
+		             (org-with-point-at (org-element-property :end context)
+			             (skip-chars-backward " \t\n")
+			             (> (point) origin))))
           (let ((org-link-frame-setup (copy-alist org-link-frame-setup)))
             (setf (alist-get 'file org-link-frame-setup) 'find-file-other-window)
             (org-open-at-point args)))
       (t (org-insert-todo-heading-respect-content)))))
 
 ;;;;; M-Return
-
+(defun mist()
+  (list (org-element-type (org-element-context (org-element-at-point))) (face-at-point nil t)))
 (defun pm-meta-return ()
-  (cond
-   ;; enforce opening links in emacs
-   ((eq 'link (org-element-type (org-element-context)))
-    (org-link-open (org-element-context) '(emacs)))
-   ;; toogle heading for active region
-   ((org-region-active-p)
-    (org-toggle-heading)
-    t)))
+  (let ((context (org-element-context)))
+    (cond
+     ;; enforce opening links in emacs
+     ((and (eq 'link (org-element-type (org-element-context)))
+           ;; Ensure point is not on the white spaces after
+		       ;; the link.
+		       (let ((origin (point)))
+		         (org-with-point-at (org-element-property :end context)
+			         (skip-chars-backward " \t\n")
+			         (> (point) origin))))
+      (org-link-open (org-element-context) '(emacs)))
+     ;; toogle heading for active region
+     ((org-region-active-p)
+      (org-toggle-heading)
+      t))))
 
 ;;;;; Tab
 
