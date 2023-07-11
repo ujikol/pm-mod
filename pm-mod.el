@@ -517,7 +517,7 @@ If nil org-agenda-files are handled the normal org-way.")
   (set-register ?a (cons 'file pm-agenda-files-root))
   (set-register ?n (cons 'file  org-default-notes-file))
 
-  (org-link-set-parameters "cteval" :follow (lambda (link) (pm-eval-block link)) :face 'pm-action-face)
+  (org-link-set-parameters "pmeval" :follow (lambda (link) (pm-eval-block link)) :face 'pm-action-face)
 
 ;;;; Templates
   
@@ -672,6 +672,7 @@ If nil org-agenda-files are handled the normal org-way.")
 
   (require 'ox-html)
   (setq org-export-exclude-tags '("_noexport"))
+  (pm-load-html-style)
 
   ;; Is it really necessary to define a backend to just add a menu entry to the export dispatcher?
   (org-export-define-derived-backend 'pm-html 'html
@@ -991,7 +992,7 @@ To avoid this just redefine this function as:
   (let ((tags (org-element-property :tags el))
         (parent (org-element-property :parent el)))
     (when parent
-      (setq tags (nconc tags (pm--collect-ancestors-tags parent))))
+      (setq tags (-union tags (pm--collect-ancestors-tags parent))))
     tags))
 
 (defun pm--load-agenda-files-from-file (file &optional referrer)
@@ -1506,7 +1507,7 @@ SEPARATOR specifies what string to place between the extracted stakeholders."
 ;; TODO: generalize this
 
 (require 'ox-html)
-(defun pm-load-html-style ()
+(defun pm-load-html-style (&optional css-file)
   ;; html style, with optional TOC and Sharepoint limitations warning.
   (setq org-html-head-include-default-style nil)
   ;; <!--/*--><![CDATA[/*><!--*/
@@ -1517,7 +1518,7 @@ SEPARATOR specifies what string to place between the extracted stakeholders."
 <!--/*--><![CDATA[/*><!--*/
 %s/*]]>*/-->
 </style>
-" (f-read-text (f-join pm-home "internal" "page.css"))))
+" (f-read-text (or css-file (f-join (f-dirname (symbol-file 'pm-mod)) "page.css")))))
   (setq org-html-scripts "
 <script>
   window.onload = function() {
@@ -2036,14 +2037,13 @@ foreach ($it in $news) { if ($olds -notcontains $it) { New-TeamChannel -GroupID 
                           (-partition 2 (cadr node))))))
 
 (defun pm--msteams-extract-users-from-structure (node)
-  (--map (s-replace "@sec-consult.com" "@atos.net" it) 
-         (--remove (s-equals? it "")
-                   (s-split ";"
-                            (s-join ";"
-                                    (org-element-map node 'paragraph
-                                      (lambda (it)
-                                        (s-replace "\n" ";"
-                                                   (pm-expand-string (pm-element-get-raw-text it))))))))))
+  (--remove (s-equals? it "")
+            (s-split ";"
+                     (s-join ";"
+                             (org-element-map node 'paragraph
+                               (lambda (it)
+                                 (s-replace "\n" ";"
+                                            (pm-expand-string (pm-element-get-raw-text it)))))))))
 
 (defun pm--msteams-extract-channels-from-structure (node)
   (--map
@@ -2233,9 +2233,10 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
 (defun pm-eval-block (name)
   (let ((point (point)))
     (org-with-wide-buffer
-     (goto-char (org-babel-find-named-block name))
+     (goto-char (point-min))
+    (when (re-search-forward (format "^#\\+NAME:[ \t]+%s[ \t]*$" (regexp-quote name)) nil t)
      (org-babel-eval-wipe-error-buffer)
-     (org-babel-execute-src-block nil nil '((var . ("point" . point)))))))
+      (org-babel-execute-src-block nil nil '((var . ("point" . point))))))))
 
 ;;;; Context sensitive key binding
 ;;;;; M-Left/Right
