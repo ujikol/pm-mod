@@ -789,7 +789,8 @@ You should install the font Iosevka Term for a nicer appearance:
   (minibuffer-with-setup-hook 'pm-minibuffer-mode
     (org-set-tags (read-from-minibuffer "Tags/Actors:\n" (org-make-tag-string (org-get-tags nil t))))))
 
-(defun pm-schedule-remove () (interactive) (org-deadline `(4)))
+(defun pm-schedule-remove () (interactive) (org-schedule `(4)))
+(defun pm-deadline-remove () (interactive) (org-deadline `(4)))
 
 ;;;;; Inline tasks
 (require 'org-inlinetask)
