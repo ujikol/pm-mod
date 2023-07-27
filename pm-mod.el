@@ -331,8 +331,6 @@ If nil org-agenda-files are handled the normal org-way.")
                                        (org-agenda-overriding-header "Todo list")
                                        (org-agenda-sorting-strategy '(category-up priority-down))))))
 
-    (add-hook 'org-agenda-mode-hook 'pm-fix-agenda-window-width)
-
 ;;;;; Key bindings
     
     (when pm-mnemonic-key-bindings
@@ -576,6 +574,106 @@ If nil org-agenda-files are handled the normal org-way.")
   (setq org-pretty-entities-include-sub-superscripts nil)
   (setq org-ellipsis "…")
   (setq org-modern-hide-stars nil) ; somehow fixes indentation of body
+  ;;(setq org-modern-label-border 'auto) ; cause alignment issues (e.g. in agenda view) otherwise
+  (setq org-modern-todo t)
+
+;;;;;; Patch org-modern to remove paddings that break allignments
+
+  (el-patch-feature org-modern--todo)
+  (el-patch-feature org-modern--tag)
+  (el-patch-feature org-modern--priority)
+  (el-patch-feature org-modern-agenda)
+  (with-eval-after-load 'org-modern
+    ;; Do not add padding - prevent break of agenda allignment
+    (el-patch-defun org-modern--todo ()
+      "Prettify headline todo keywords."
+      (let ((todo (match-string 1))
+            (beg (match-beginning 1))
+            (end (match-end 1)))
+        (el-patch-remove
+          (put-text-property beg (1+ beg) 'display
+                             (format #(" %c" 1 3 (cursor t)) (char-after beg)))
+          (put-text-property (1- end) end 'display (string (char-before end) ?\s)))
+        (put-text-property
+         beg end 'face
+         (if-let ((face (or (cdr (assoc todo org-modern-todo-faces))
+                            (cdr (assq t org-modern-todo-faces)))))
+             `(:inherit (,face org-modern-label))
+           (if (member todo org-done-keywords)
+               'org-modern-done
+             'org-modern-todo)))))
+    ;; Do not add padding - prevent break of agenda allignment
+    (el-patch-defun org-modern--tag ()
+      "Prettify headline tags."
+      (save-excursion
+        (let* ((default-face (get-text-property (match-beginning 1) 'face))
+               (colon-props `(display #(":" 0 1 (face org-hide)) face ,default-face))
+               (beg (match-beginning 2))
+               (end (match-end 2))
+               colon-beg colon-end)
+          (goto-char beg)
+          (while (re-search-forward "::?" end 'noerror)
+            (let ((cbeg (match-beginning 0))
+                  (cend (match-end 0)))
+              (when colon-beg
+                (el-patch-remove
+                  (put-text-property colon-end (1+ colon-end) 'display
+                                     (format #(" %c" 1 3 (cursor t)) (char-after colon-end)))
+                  (put-text-property (1- cbeg) cbeg 'display
+                                     (string (char-before cbeg) ?\s)))
+                (put-text-property colon-end cbeg 'face 'org-modern-tag))
+              (add-text-properties cbeg cend colon-props)
+              (setq colon-beg cbeg colon-end cend))))))
+    ;; Do not add padding - breaks agenda allignment
+    (el-patch-defun org-modern--priority ()
+      "Prettify priorities according to `org-modern-priority'."
+      (let* ((beg (match-beginning 1))
+             (end (match-end 1))
+             (prio (char-before (1- end))))
+        (if-let ((rep (and (consp org-modern-priority)
+                           (cdr (assq prio org-modern-priority)))))
+            (put-text-property beg end 'display rep)
+          (put-text-property beg (1+ beg) 'display (el-patch-swap " " ""))
+          (put-text-property (1- end) end 'display (el-patch-swap " " ""))
+          (put-text-property
+           beg end 'face
+           (if-let ((face (or (cdr (assq prio org-modern-priority-faces))
+                              (cdr (assq t org-modern-priority-faces)))))
+               `(:inherit (,face org-modern-label))
+             'org-modern-priority)))))
+    ;; Correct allignment for lines with priority
+    (el-patch-defun org-modern-agenda ()
+      "Finalize Org agenda highlighting."
+      (remove-from-invisibility-spec 'org-modern)
+      (add-to-invisibility-spec 'org-modern) ;; Not idempotent?!
+      (add-hook 'pre-redisplay-functions #'org-modern--pre-redisplay nil 'local)
+      (save-excursion
+        (save-match-data
+          (when org-modern-todo
+            (goto-char (point-min))
+            (let ((re (format " %s "
+                              (regexp-opt
+                               (append org-todo-keywords-for-agenda
+                                       org-done-keywords-for-agenda) t)))
+                  (org-done-keywords org-done-keywords-for-agenda))
+              (while (re-search-forward re nil 'noerror)
+                (org-modern--todo))))
+          (when org-modern-tag
+            (goto-char (point-min))
+            (let ((re (concat "\\( \\)\\(:\\(?:" org-tag-re "::?\\)+\\)[ \t]*$")))
+              (while (re-search-forward re nil 'noerror)
+                (org-modern--tag))))
+          (when org-modern-priority
+            (goto-char (point-min))
+            (while (re-search-forward "\\(\\[#.\\]\\)" nil 'noerror)
+              ;; For some reason the org-agenda-fontify-priorities adds overlays?!
+              (when-let ((ov (overlays-at (match-beginning 0))))
+                (overlay-put (car ov) 'face nil))
+              (org-modern--priority)
+              (el-patch-add
+                (when (re-search-forward (concat "\\( \\)\\(:\\(?:" org-tag-re "::?\\)+\\)[ \t]*$") (line-end-position) 'noerror)
+                  (goto-char (match-beginning 0))
+                  (insert "  ")))))))))
 
 ;;;;; Fonts
 
@@ -1043,9 +1141,6 @@ Links in archived branches are ignored. A link tagged with \"_notes\" is set as 
     (message "Loaded %s agenda files." (length org-agenda-files))))
 
 ;;;;; Agenda definitions
-(defun pm-fix-agenda-window-width ()
-  (setq org-agenda-tags-column (- (truncate (/ (window-text-width) 1.11)))))
-
 (defun pm-entry-get-actors ()
   (--map (substring-no-properties it)
          (--filter (s-prefix? "@" it) (org-get-tags))))
