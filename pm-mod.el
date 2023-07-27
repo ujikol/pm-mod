@@ -50,7 +50,7 @@ If nil org-agenda-files are handled the normal org-way.")
       (define-key cua--rectangle-keymap (kbd "C-f") 'cua-fill-char-rectangle)
       (define-key cua--region-keymap (kbd "<C-return>") nil)
       (define-key cua-global-keymap (kbd "<C-return>") nil)
-      (define-key org-mode-map (kbd "<C-return>") 'pm-ctrl-return)
+      (define-key org-mode-map (kbd "<C-return>") 'org-ctrl-c-ctrl-c)
 
       (global-unset-key (kbd "C-y"))
       (global-unset-key (kbd "C-x C-q"))
@@ -452,7 +452,7 @@ If nil org-agenda-files are handled the normal org-way.")
       (add-hook 'org-metaup-hook 'ch/org-metaup-inlinetask t)
       (add-hook 'org-metadown-hook 'ch/org-metadown-inlinetask t)
       (define-key org-mode-map (kbd "<return>") 'pm-return)
-      (add-hook 'org-ctrl-c-ctrl-c-final-hook 'pm-insert-inlinetask)
+      (add-hook 'org-ctrl-c-ctrl-c-final-hook 'pm-before-ctrl-c-ctrl-c)
       (define-key org-mode-map (kbd "<C-S-return>") 'pm-ctrl-shift-return)
       (add-hook 'org-metareturn-hook 'pm-meta-return)
       (define-key org-mode-map (kbd "<tab>") 'pm-tab)
@@ -864,8 +864,7 @@ This function is meant to be used in `org-cycle-hook'."
         (if (looking-at-p "[[:space:]]*$")
             (delete-char 1))))
     (let ((id (pm-new-action-id)))
-      (when id (insert id))))
-  t)
+      (when id (insert id)))))
 
 (defun pm-convert-inlinetask ()
   (interactive)
@@ -879,7 +878,7 @@ This function is meant to be used in `org-cycle-hook'."
              (org-inlinetask-goto-end)
              (forward-line -1)
              (kill-whole-line)))
-          ((and (or (org-at-heading-p) (or (outline-back-to-heading t) t))
+          ((and (org-at-heading-p)
                 (or (org-entry-is-todo-p) (org-entry-is-done-p)))
            (let ((promote (- org-inlinetask-min-level (org-current-level))))
              (beginning-of-line)
@@ -893,7 +892,7 @@ This function is meant to be used in `org-cycle-hook'."
              (insert (make-string promote ?*))
              (outline-next-heading)
              (insert (concat (make-string org-inlinetask-min-level ?*) " END\n"))))
-          (t (user-error "There s no task to convert.")))))
+          (t (pm-insert-inlinetask)))))
 
 (defun pm--inlinetask-link-patch-advice (oldfun &rest args)
   "Work-around to treat inline tasks like normal tasks, e.g. to enable linking to them during export."
@@ -2304,8 +2303,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
 
 ;;;;; C-Return
 
-(defun pm-ctrl-return (&rest args)
-  (interactive)
+(defun pm-before-ctrl-c-ctrl-c ()
   (cond
    ;; show people directory entry if on @xxx
    ((let ((link (thing-at-point 'word t)))
@@ -2344,13 +2342,9 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
     (org-table-iterate)
     (org-table-shrink)
     nil)
-   ;; create inlinetask if selection instead of changing selection to rectangle selection
-   ((use-region-p)
-    (pm-insert-inlinetask))
    ;; enforce opening links with system app
    ((eq 'link (org-element-type (org-element-context)))
-    (org-link-open (org-element-context) '(system)))
-   (t (org-ctrl-c-ctrl-c args))))
+    (org-link-open (org-element-context) '(system)))))
 
 ;;;;; C-S-Return
 
