@@ -1833,67 +1833,8 @@ $inspector.Activate()
 "
                             nil (plist-get '(mail 0 appointment 1 task 3) item-type) setters))))
 
-(defun pm-create-tasks (&optional up)
-  (setq up (if (org-string-nw-p up) (string-to-number up) 1))
-  (let ((priorities '())
-        outlist
-        headers)
-    (org-with-wide-buffer
-      (org-back-to-heading t)
-      (dotimes (i up)
-        (org-up-element))
-      (save-restriction ; (org-map-entries ... 'tree) does not work here ???
-        (org-narrow-to-subtree)
-        (org-map-entries
-         (lambda ()
-           (let ((state (org-entry-get nil "TODO"))
-                 (priority (org-entry-get nil "PRIORITY"))
-                 (item (org-entry-get nil "ITEM"))
-                 (tags (org-entry-get nil "TAGS"))
-                 (alltags (org-entry-get nil "ALLTAGS"))
-                 (dl (org-entry-get nil "DEADLINE"))
-                 (closing-date (org-entry-get nil "CLOSED"))
-                 id)
-             (setq alltags (if alltags (s-split ":" alltags) '()))
-             (when (and (or (not org-export-select-tags) (not (-intersection org-export-select-tags (-flatten (org-get-buffer-tags)))) (-intersection alltags org-export-select-tags))
-                        (or org-export-exclude-tags (not (-intersection alltags org-export-exclude-tags)))
-                        (or (equal state "TODO")
-                            (equal state "WAITING")
-                            (equal state "QUESTION")
-                            (and (or (equal state "DONE") (equal state "CANCELED"))
-                                 closing-date (>= (org-time-convert-to-integer (org-time-string-to-time closing-date))
-                                                  (org-time-convert-to-integer (org-read-date t t (or recently-done "")))))))
-               (setq id (pm-extract-task-id item))
-               (add-to-list 'outlist
-                            (list 
-                             (cond ((equal state "TODO") '("b" "blue"))
-                                   ((equal state "DONE") '("d" "steelblue"))
-                                   ((equal state "CANCELED") '("e" "grey"))
-                                   ((equal state "WAITING") '("c" "turquoise"))
-                                   ((equal state "QUESTION") '("a" "rosybrown")))
-                             state
-                             priority
-                             (if dl dl "_/*None*/_")
-                             (or (and id (format "@QY@QYhtml:<a href=\"#%s\">#%s</a>@@ %s" id id (substring item (+ (length id) 2)))) item)
-                             (if tags
-                                 (mapconcat 'identity (--filter (s-starts-with? "@" it) (s-split ":" tags)) " ")
-                               "_/*None*/_")))
-               (setq priorities (-union priorities (list priority))))))))
-      (if (not outlist)
-          "No open tasks"
-        (setq outlist (--sort
-                       (string-lessp (concat (caar it) (nth 2 it) (nth 3 it) (nth 4 it))
-                                     (concat (caar other) (nth 2 other) (nth 3 other) (nth 4 other))) outlist))
-        (setq outlist (--map
-                       (cons (format "@QY@QYhtml:<span style=\"color:%s\">%s</span>@@" (cadar it) (cadr it)) (cddr it))
-                       outlist))
-        (if (> (length priorities) 1)
-            (setq headers '("State" "Pri" "Due" "Title" "Actor"))
-          (setq headers '("State" "Due" "Title" "Actor"))
-          (setq outlist (-select-columns '(0 2 3 4) outlist)))
-        (replace-regexp-in-string "@QY@QYhtml:" "@@html:" ; work around orgtbl-to-orgtbl filtering out inline html
-                                  (orgtbl-to-orgtbl (nconc (list headers 'hline) outlist) '())
-                                  t t)))))
+(defun pm-outlook-create-tasks (&optional up)
+  "Take code from (pm-outlook-create-tasks) as basis.")
 
 (defun pm-outlook-open (link) 
   (shell-command (concat "\"" pm-outlook-cmd "\" outlook:" link)))
@@ -2176,12 +2117,14 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
     (unless link
       (user-error "No web hook specified."))
     (request
-      (concat (if (or (not pm-mst-webhook-urlbase) (s-prefix? urlbase link t)) "" urlbase) link)
+      (concat (if (or (not pm-mst-webhook-urlbase) (s-prefix? "http" link t)) "" pm-mst-webhook-urlbase) link)
       :type "POST"
       :headers '(("Content-Type" . "application/json"))
       :data (json-encode `(("text" . ,msg)))
       :parser 'json-read
-      :success (cl-function (lambda (&key data &allow-other-keys) (message "message posted"))))))
+      :success (cl-function (lambda (&key data &allow-other-keys) (message "message posted:\n%s" data)))
+      :error (cl-function (lambda (&key error-thrown &allow-other-keys)
+                            (error "Posting failed:\nError: %s" (cdr error-thrown)))))))
 
 (org-link-set-parameters "pm_msteams_team_setup" :follow (lambda (link) (pm-msteams-setup-team-with-structure link)) :face 'pm-action-face)
 (org-link-set-parameters "pm_channel_post" :follow #'pm-post-into-channel :face 'pm-action-face)
