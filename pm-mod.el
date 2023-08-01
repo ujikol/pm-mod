@@ -1860,7 +1860,7 @@ Sub FollowUp()
     Dim url As String
       
     Set objItem = Application.ActiveExplorer.Selection.Item(1)
-    url = \"org-protocol:/capture?template=t&body=\" + \"[[\" + objItem.EntryID + \"][\" + getItemTitle(objItem) + \"]]\"
+    url = \"org-protocol:/capture?template=t&body=\" + \"[[outlook:\" + objItem.EntryID + \"][\" + getItemTitle(objItem) + \"]]\"
     ShellExecute 0, vbNullString, url, vbNullString, vbNullString, vbNormalFocus
 End Sub
 
@@ -1871,20 +1871,53 @@ Function getItemTitle(objItem As Object)
         Exit Function
     End If
     If objItem.Class = olMail Then
-        getItemTitle = \"Mail: \" + objItem.Subject + \" (\" + objItem.SenderName + \")\"
+        itemTitle = \"Mail: \" + objItem.Subject + \" (\" + objItem.SenderName + \")\"
     ElseIf objItem.Class = olAppointment Then
-        getItemTitle = \"Meeting: \" + objItem.Subject + \" (\" + objItem.Organizer + \")\"
+        itemTitle = \"Meeting: \" + objItem.Subject + \" (\" + objItem.Organizer + \")\"
     ElseIf objItem.Class = olTask Then
-        getItemTitle = \"Task: \" + objItem.Subject + \" (\" + objItem.Owner + \")\"
+        itemTitle = \"Task: \" + objItem.Subject + \" (\" + objItem.Owner + \")\"
     ElseIf objItem.Class = olContact Then
-        getItemTitle = \"Contact: \" + objItem.Subject + \" (\" + objItem.FullName + \")\"
+        itemTitle = \"Contact: \" + objItem.Subject + \" (\" + objItem.FullName + \")\"
     ElseIf objItem.Class = olJournal Then
-        getItemTitle = \"Journal: \" + objItem.Subject + \" (\" + objItem.Type + \")\"
+        itemTitle = \"Journal: \" + objItem.Subject + \" (\" + objItem.Type + \")\"
     ElseIf objItem.Class = olNote Then
-        getItemTitle = \"Note: \" + objItem.Subject + \" (\" + \" \" + \")\"
+        itemTitle = \"Note: \" + objItem.Subject + \" (\" + \" \" + \")\"
     Else
-        getItemTitle = \"Item: \" + objItem.Subject + \" (\" + objItem.MessageClass + \")\"
+        itemTitle = \"Item: \" + objItem.Subject + \" (\" + objItem.MessageClass + \")\"
     End If
+    getItemTitle = URLEncode(itemTitle)
+End Function
+
+Public Function URLEncode( _
+   StringVal As String, _
+   Optional SpaceAsPlus As Boolean = False _
+) As String
+
+  Dim StringLen As Long: StringLen = Len(StringVal)
+
+  If StringLen > 0 Then
+    ReDim result(StringLen) As String
+    Dim i As Long, CharCode As Integer
+    Dim Char As String, Space As String
+
+    If SpaceAsPlus Then Space = \"+\" Else Space = \"%20\"
+
+    For i = 1 To StringLen
+      Char = Mid$(StringVal, i, 1)
+      CharCode = Asc(Char)
+      Select Case CharCode
+        Case 97 To 122, 65 To 90, 48 To 57, 45, 46, 95, 126
+          result(i) = Char
+        Case 32
+          result(i) = Space
+        Case 0 To 15
+          result(i) = \"%0\" & Hex(CharCode)
+        Case Else
+          result(i) = \"%\" & Hex(CharCode)
+      End Select
+    Next i
+    URLEncode = Join(result, \"\")
+  End If
 End Function
 ")
     (copy-region-as-kill (point-min) (point-max)))
