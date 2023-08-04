@@ -6,6 +6,8 @@
 (require 'org)
 (require 'org-protocol)
 
+;;; Variables
+
 (defvar pm-mnemonic-key-bindings t
   "Whether to define mnemonic key bindings.")
 
@@ -15,6 +17,14 @@ If nil org-agenda-files are handled the normal org-way.")
 
 (defvar user-match-code nil
   "Match code (acronym) of user.")
+
+;;; Utility functions
+
+(defmacro or-nil (&rest body)
+  "Catch error and return nil in case of error."
+  `(condition-case nil
+    (progn ,@body)
+  (error nil)))
 
 ;;; Basic settings
 
