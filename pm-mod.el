@@ -283,6 +283,11 @@ If nil org-agenda-files are handled the normal org-way.")
       (global-set-key (kbd "M-g") 'goto-line))
     
 ;;;; Agenda
+
+    (when pm-mnemonic-key-bindings
+      (define-key org-agenda-mode-map (kbd "<return>") 'org-agenda-goto)
+      (define-key org-agenda-mode-map (kbd "<S-return>") 'org-agenda-switch-to))
+
 ;;;;; Agenda files
 
     (when pm-agenda-files-root
@@ -1731,7 +1736,7 @@ org-protocol://ct:/path=c:/path/file.org&search=*Heading"
   "Face for action links."
   :group 'org-faces)
 
-(org-link-set-parameters "ctrun" :follow 'pm-org-invoke-babel-named :face 'pm-action-face)
+(org-link-set-parameters "pmrun" :follow 'pm-org-invoke-babel-named :face 'pm-action-face)
 (add-to-list 'org-protocol-protocol-alist
              '("CoolTool"
                :protocol "pm"
@@ -2151,14 +2156,12 @@ foreach ($it in $news) { if ($olds -notcontains $it) { New-TeamChannel -GroupID 
 (defun pm-post-into-channel (link)
   "Post the contents of this branch as message into the MsTeams channel referenced by a web hook ID.
 The web hook ID can be specified as link, or is otherwise taken from the property/keyword MST_Hook."
-  (let ((link (if (length> (s-trim link) 0)
-                  (pm-expand-string link)
-                (save-excursion (org-entry-get nil "MST_Hook"))))
-        (msg (replace-regexp-in-string
+  (when (eq length (s-trim link) 0)
+    (setq link (or (save-excursion (org-entry-get nil "MST_Hook"))
+                   (user-error "No web hook specified."))))
+  (let ((msg (replace-regexp-in-string
               "<div id='SharepointWarning'.+\n" ""
               (org-export-as 'pm-html t nil t))))
-    (unless link
-      (user-error "No web hook specified."))
     (request
       (concat (if (or (not pm-mst-webhook-urlbase) (s-prefix? "http" link t)) "" pm-mst-webhook-urlbase) link)
       :type "POST"
