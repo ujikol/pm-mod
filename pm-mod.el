@@ -425,6 +425,10 @@ If nil org-agenda-files are handled the normal org-way.")
 
     (push #'pm-msteams-allowed-property-values org-property-allowed-value-functions)
 
+;;;;; Jira
+
+    (org-link-set-parameters "pmjiracreate" :follow 'pm-jira-create-ticket-from-branch :face 'pm-action-face)
+
 ;;;; Completion
 
     (require 'company)
@@ -2180,13 +2184,29 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                       (-partition 2 pm-msteams-properties))))
 
 ;;;;; Jira
-;; Very basic implementation based on deep links
 
-(defvar pm-jira-url nil
-  "Base URL to access Jira instance.")
+(require 'ox-confluence)
 
-(defun pm-jira (action fields)
-  "Create or query Jira ticket."
+(defvar pm-jira-url nil "Base URL of Jira")
+(defvar pm-jira-debug nil
+  "t for *Request Response* buffer and deug messages. 'local for local httpbin.
+(docker run -p 80:80 kennethreitz/httpbin)")
+(defvar pm-jira-user nil "User to use to authenticate against Jira.")
+(defvar pm-jira-get-token (lambda () (or-nil (s-trim (f-read-text pm-jira-credentials-file))))
+  "Function which provides token for authentication.")
+(defvar pm-jira-renew-token (lambda ()
+                              (message "Jira credentials are not set or expired. Let's renew them.")
+                              (let (token)
+                                (while (not (eq 13 (read-char "I'm going to open a Jira page. Please create a new token there, copy it to the clipboard, and return here. Press Return now."))))
+                                (org-link-open-from-string (concat pm-jira-url "secure/ViewProfile.jspa?selectedTab=com.atlassian.pats.pats-plugin:jira-user-personal-access-tokens"))
+                                (setq token (read-from-minibuffer "Paste the token here: "))
+                                (f-write-text token 'dos pm-jira-credentials-file)
+                                (message "New Jira token stored.")
+                                token))
+  "Function which renews the token. Is called when `pm-jira-get-token returns nil, or request fails due to authentication error.")
+
+(defun pm-jira-via-browser (action fields)
+  "Create or view Jira ticket via deep link."
   (pm-open-externally
    (print
     (pm-expand-string
@@ -2197,8 +2217,210 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
              (mapconcat (lambda (pair) (format "%s=%s" (car pair) (cadr pair)))
                         fields "&"))))))
 
+(cl-defun pm-jira-request (method endpoint &key data sync success error arguments-to-response)
+  "Calls API2 on ENDPOINT on `pm-jira-url\\='. For most other parameter see `request\\='."
+  (let (;(request-curl-options '("--cacert ~/Sec-Root-CA.pem"))
+        (method (upcase (symbol-name method)))
+        (endpoint (if (eq pm-jira-debug 'local)
+                      (concat "http://localhost/" (downcase (symbol-name method)))
+                    (concat pm-jira-url "rest/api/2/" endpoint)))
+        (data (and data (json-encode data)))
+        (request-message-level (if pm-jira-debug 'debug 'warn))
+        result)
+    (when pm-jira-debug
+      (message "Requesting %s with data:\n%s." endpoint data))
+    (request endpoint
+      :user (unless pm-jira-get-token pm-jira-user)
+      :sync sync
+      :type method
+      :data data
+      :headers (-concat (and pm-jira-get-token
+                             `(("Authorization" .
+                                ,(format "Bearer %s"
+                                         (let ((token (funcall pm-jira-get-token)))
+                                           (while (not token)
+                                             (unless (yes-or-no-p "First you need to get an authentication token from Jira. Create token?")
+                                               (user-error "Cannot proceed without renewed token."))
+                                             (funcall pm-jira-renew-token)
+                                             (setq token (funcall pm-jira-get-token)))
+                                           token)))))
+                        (and data '(("Content-Type" . "application/json"))))
+      :parser (if pm-jira-debug
+                  (lambda ()
+                    (let ((string (buffer-string))
+                          (json-array-type 'list))
+                      (with-current-buffer (get-buffer-create "*Request Response*")
+                        (erase-buffer)
+                        (insert string)
+                        (json-pretty-print (point-min) (point-max)))
+                      (or-nil (json-read))))
+                (lambda ()
+                  (let ((json-array-type 'list))
+                    (or-nil (json-read)))))
+      :success (or success (cl-function (lambda (&key data &allow-other-keys)
+                                          (setq result data)
+                                          (message "Request succeeded."))))
+      :error (or error (cl-function (lambda (&key error-thrown &allow-other-keys)
+                                      (when (eq 401 (caddr error-thrown))
+                                        (when (yes-or-no-p "Request failed at authentication. Do you want to renew the token?")
+                                          (funcall pm-jira-renew-token)
+                                          (user-error "Retry now!")))
+                                      (error "Request failed: %s" (cdr error-thrown))))))
+    result))
 
+(defmacro pm-jira-build-definition-retrieval (entity-type &rest body)
+  "Build function to retrieve and cache a certain Jira entity type definition."
+  (let ((cache-symbol (intern (concat "pm--jira-" (downcase entity-type) "s")))
+        (pull-date-symbol (intern (concat "pm--jira-" (downcase entity-type) "s-pull-date")))
+        (function-symbol (intern (concat "pm-jira-"  (downcase entity-type) "s"))))
+    `(progn
+       (defvar ,cache-symbol nil "Map of filtered previous retrieval.")
+       (defvar ,pull-date-symbol nil "Date of last actual retrieval.")
+       (defun ,function-symbol (&optional enforce-pull async)
+         (when (or enforce-pull (not (equal (calendar-current-date) ,pull-date-symbol)))
+           (pm-jira-request 'get ,entity-type
+                            :sync (not async)
+                            :success (cl-function (lambda (&key data &allow-other-keys)
+                                                    (setq ,cache-symbol (progn ,@body))
+                                                    (setq ,pull-date-symbol (calendar-current-date))))))
+         ,cache-symbol))))
 
+(pm-jira-build-definition-retrieval
+ "project"
+ (--map
+  (list (cdr (assoc 'key it))
+        (cdr (assoc 'id it))
+        (cdr (assoc 'name it)))
+  data))
+
+(pm-jira-build-definition-retrieval
+ "issuetype"
+ (--map
+  (list (cdr (assoc 'name it))
+        (cdr (assoc 'id it)))
+  data))
+
+(pm-jira-build-definition-retrieval
+ "field"
+ (--map
+  (list (cdr (assoc 'name it))
+        (cdr (assoc 'id it))
+        (or (or-nil (number-to-string (cdr (assoc 'customId (cdr (assoc 'schema it)))))) (cdr (assoc 'name it))))
+  data))
+
+(pm-jira-build-definition-retrieval
+ "issueLinkType"
+ (--map
+  (list (cdr (assoc 'name it))
+        (cdr (assoc 'id it))
+        (cdr (assoc 'inward it))
+        (cdr (assoc 'outward it)))
+  (cdar data)))
+
+(cl-defun pm-jira-query (query &key fields expand sync success error)
+  "Query using JQL."
+  (let ((data `(("jql" . ,query)))
+        result)
+    (pm-jira-request 'post "search"
+                     :data data
+                     :sync sync)
+    result))
+
+(defun pm-jira-create-link (ticket1-key ticket2-key &optional type-name)
+  "Link a Jira ticket to another."
+  (let* ((link-data `(("type" . (("name" . ,(or type-name "Relates")))) ("inwardIssue" . (("key" . ,ticket1-key))) ("outwardIssue" . (("key" . ,ticket2-key)))))
+         succeeded)
+    (pm-jira-request 'post "issueLink"
+                     :data link-data
+                     :sync t
+                     :success (cl-function (lambda (&key response &allow-other-keys)
+                                             (setq succeeded t)))
+                     :error (cl-function (lambda (&key error-thrown &allow-other-keys)
+                                           (message "Link creation failed:%s" (cdr error-thrown)))))
+    (when pm-jira-debug
+      (if succeeded
+          (message "Link created: %s" link-data)
+        (message "Link creation failed:%s" link-data)))
+    succeeded))
+
+(defun pm-jira-create-ticket (project-key issuetype-name data &optional links)
+  "Create a Jira ticket optionally linked to existing tickets.
+Links is a list of lists, each consisting of inwardissue, outwardissue and optionally type. nil represents the place of the issue to be created.
+Both success and error funktion need to accept one parameter: KEY of created issue. error also gets FAILED-LINKS."
+  (let* ((data (-concat `(("project" . (("key" . ,project-key))) ("issuetype" . (("name" . ,issuetype-name)))) data))
+         (data `(("fields" . ,data)))
+         key failed-links)
+    (pm-jira-request 'post "issue"
+                     :data data
+                     :sync t
+                     :success (cl-function (lambda (&key data &allow-other-keys)
+                                             (setq key (cdr (assoc 'key data)))
+                                             (if (not links)
+                                                 (when pm-jira-debug
+                                                   (message "Ticket created: %s." key))
+                                               (--map
+                                                (unless (pm-jira-create-link (or (car it) key) (or (cadr it) key) (caddr it))
+                                                  (nconc failed-links (list it)))
+                                                links)
+                                               (when pm-jira-debug
+                                                 (unless failed-links
+                                                   (message "Links created: %s." links))))))
+                     :error (cl-function (lambda (&key error-thrown &allow-other-keys)
+                                           (message "Ticket creation failed:%s" (cdr error-thrown)))))
+    (list key failed-links)))
+
+(defun pm-jira-create-ticket-from-branch (link)
+  "Create a Jira issue based on the contents of the org heading at point.
+The first word of link specifies the project key, the rest the name of the issuetype.
+Each direct subheading is the name of a field and its content is the value.
+The value of the description field is converted to Confluence wiki format.
+Other values are macro expanded.
+The value of the `Links' field specify other issues to which the new issue will be linked after creation."
+  (let ((what (s-match "\\([[:alnum:]-_]+\\) +\\([[:alnum:]-_][[:alnum:]-_ ]*\\)" link))
+        (org-export-show-temporary-export-buffer nil)
+        project issuetype data links key)
+    (unless what
+      (user-error "Incorrect Jira project and issue type: %s" link))
+    (setq project (nth 1 what))
+    (setq issuetype (s-trim (nth 2 what)))
+    (--map
+     (let ((field (org-ml-get-property :raw-value it))
+           (value (buffer-substring-no-properties (org-ml-get-property :contents-begin it) (org-ml-get-property :contents-end it))))
+       (if (s-equals? field "Links")
+           (setq links (-non-nil (--map
+                                  (when (org-string-nw-p it)
+                                    (let ((what (s-match "\\([[:alnum:]-_]+\\)\\( +\\([[:alnum:]-_][[:alnum:]-_ ]*\\)\\)?" (pm-expand-string it)))
+                                          other name inward outward name)
+                                      (unless what
+                                        (user-error "Incorrect Jira link format: %s" it))
+                                      (setq other (nth 1 what))
+                                      (setq name (or (nth 3 what) "relates to"))
+                                      (unless (--first (or (and (s-equals? name (nth 2 it))
+                                                                (setq inward other)
+                                                                (setq name (car it)))
+                                                           (and (s-equals? name (nth 3 it))
+                                                                (setq outward other)
+                                                                (setq name (car it))))
+                                                       (pm-jira-issuelinktypes))
+                                        (user-error "Unknown Jira link type: %s" name))
+                                      (list inward outward name)))
+                                  (s-split "\n" value))))
+         (setq field (cadr (or (assoc field (pm-jira-fields))
+                               (user-error "Unknown Jira field: %s" field))))
+         (setq value (if (s-equals? field "description")
+                         (org-with-wide-buffer
+                          (goto-char (org-ml-get-property :contents-begin it))
+                          (with-current-buffer (org-confluence-export-as-confluence nil t)
+                            (buffer-substring-no-properties (point-min) (point-max))))
+                       (s-trim (pm-expand-string value))))
+         (setq data (-concat data `((,field . ,value))))))
+     (org-ml-get-children (org-ml-parse-this-subtree)))
+    (setq key (pm-jira-create-ticket project issuetype data links))
+    (setq key (or (and (not (cadr key)) (car key))
+                  (user-error "FAILED! %s" key)))
+    (kill-new key)
+    (push (list (concat pm-jira-url "browse/" key) key) org-stored-links)
+    (message "Created ticket %s. Yoe can paste the key and use Ctrl-L to insert link." key)))
 
 ;;;; Completion
 
