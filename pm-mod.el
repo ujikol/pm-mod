@@ -18,14 +18,6 @@ If nil org-agenda-files are handled the normal org-way.")
 (defvar user-match-code nil
   "Match code (acronym) of user.")
 
-;;; Utility functions
-
-(defmacro or-nil (&rest body)
-  "Catch error and return nil in case of error."
-  `(condition-case nil
-    (progn ,@body)
-  (error nil)))
-
 ;;; Basic settings
 
 (defun pm-apply-basics ()
@@ -2192,7 +2184,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
   "t for *Request Response* buffer and deug messages. 'local for local httpbin.
 (docker run -p 80:80 kennethreitz/httpbin)")
 (defvar pm-jira-user nil "User to use to authenticate against Jira.")
-(defvar pm-jira-get-token (lambda () (or-nil (s-trim (f-read-text pm-jira-credentials-file))))
+(defvar pm-jira-get-token (lambda () (ignore-errors (s-trim (f-read-text pm-jira-credentials-file))))
   "Function which provides token for authentication.")
 (defvar pm-jira-renew-token (lambda ()
                               (message "Jira credentials are not set or expired. Let's renew them.")
@@ -2253,10 +2245,10 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                         (erase-buffer)
                         (insert string)
                         (json-pretty-print (point-min) (point-max)))
-                      (or-nil (json-read))))
+                      (ignore-errors (json-read))))
                 (lambda ()
                   (let ((json-array-type 'list))
-                    (or-nil (json-read)))))
+                    (ignore-errors (json-read)))))
       :success (or success (cl-function (lambda (&key data &allow-other-keys)
                                           (setq result data)
                                           (message "Request succeeded."))))
@@ -2305,7 +2297,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
  (--map
   (list (cdr (assoc 'name it))
         (cdr (assoc 'id it))
-        (or (or-nil (number-to-string (cdr (assoc 'customId (cdr (assoc 'schema it)))))) (cdr (assoc 'name it))))
+        (or (ignore-errors (number-to-string (cdr (assoc 'customId (cdr (assoc 'schema it)))))) (cdr (assoc 'name it))))
   data))
 
 (pm-jira-build-definition-retrieval
