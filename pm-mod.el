@@ -1,10 +1,13 @@
 ;;; pm-mod.el --- org-mode for project manager and business users  -*- lexical-binding: t; -*-
 
+(require 'subr-x)
 (require 'dash)
 (require 's)
 (require 'f)
 (require 'org)
 (require 'org-protocol)
+(require 'async)
+(require 'pm-util)
 
 ;;; Variables
 
@@ -812,33 +815,7 @@ You should install the font Iosevka Term for a nicer appearance:
   )
 
 ;;; Functions
-;;;; WSL
-
-(defun pm-wsl-browse-url (url &rest args)
-  (let ((match (s-match "file:///mnt/\\([a-zA-Z]\\)\\(/.*\\)" url)))
-    (setq url (concat "file:///" (nth 1 match) ":" (nth 2 match))))
-  (shell-command (concat (executable-find "wslview") " " (pm-path url))))
-
-(defun pm-linux-path (path)
-  (and path
-       (let ((match (s-match "^\\([a-zA-Z]\\):\\(/\\|\\\\\\)\\(.*\\)" path)))
-         (if match
-             (concat "/mnt/" (downcase (nth 1 match)) "/" (s-replace "\\" "/" (nth 3 match)))
-           path))))
-
-(defun pm-path (path)
-  "Make path compatible with environment."
-  (cond ((eq system-type 'gnu/linux)
-         (pm-linux-path path))
-        (t path)))
-
 ;;;; Basic functions
-
-(defun pm-delete-line ()
-  (delete-region
-   (point)
-   (save-excursion (move-end-of-line 1) (point)))
-  (delete-char 1))
 
 (defun pm-focus ()
   (interactive)
@@ -1134,59 +1111,26 @@ To avoid this just redefine this function as:
 
 ;;;; Agenda
 ;;;;; Agenda files
-(defun pm--collect-ancestors-tags (el)
-  (let ((tags (org-element-property :tags el))
-        (parent (org-element-property :parent el)))
-    (when parent
-      (setq tags (-union tags (pm--collect-ancestors-tags parent))))
-    tags))
-
-(defun pm--load-agenda-files-from-file (file &optional referrer)
-  (message "Adding agenda file %s referred in %s." file referrer)
-  (unless (-contains? org-agenda-files file)
-    (if (not (f-exists? file))
-        (lwarn 'PM :warn "Missing agenda file %s refered from %s." file referrer)
-      (with-current-buffer (find-file-noselect file)
-        (org-with-wide-buffer
-         (setq org-agenda-files (nconc org-agenda-files(list file)))
-         (org-element-map (org-element-parse-buffer) 'link
-           (lambda (el)
-             (let ((type (org-element-property :type el)))
-               (when (or (not type)
-                         (s-equals? type "file")
-                         (s-equals? type "")
-                         (s-equals? type "pj"))
-                 (let ((tags (pm--collect-ancestors-tags el))
-                       (path (pm-path (org-element-property :path el))))
-                   (when (not (-contains? tags org-archive-tag))
-                     (cond
-                      ((s-equals? type "pj")
-                       (pm--load-agenda-files-from-file
-                        (condition-case err
-                            (pm-project-file path)
-                          (user-error
-                           (message "Error collecting agenda files from %s.\n%s" file (error-message-string err))))
-                        file))
-                      ((s-suffix? ".org" path)
-                       (when (-contains? tags "_notes")
-                         (setq org-default-notes-file (f-expand path (f-dirname (buffer-file-name)))))
-                       (pm--load-agenda-files-from-file (f-expand path (f-dirname (buffer-file-name))) file))
-                      ((f-directory? path)
-                       (--map (pm--load-agenda-files-from-file it) (f-files path (lambda (f) (s-suffix? ".org" f)) t)))))))))))))))
-;;(pm-load-agenda-files)
 
 (defun pm-load-agenda-files ()
   "Build org-agenda-files recursively from links to .org files starting with root file pm_agenda_file.
 Links in archived branches are ignored. A link tagged with \"_notes\" is set as org-default-notes-file."
   (interactive)
   (setq org-agenda-files nil)
-  (when pm-agenda-files-root
-    (pm--load-agenda-files-from-file pm-agenda-files-root))
-  (if (or (not org-agenda-files) (< (length org-agenda-files) 2))
-      (lwarn 'PM :warning "No agenda files loaded from file %s." pm-agenda-files-root)
-    (let ((inhibit-debugger t))
-      (customize-save-variable 'org-agenda-files org-agenda-files))
-    (message "Loaded %s agenda files." (length org-agenda-files))))
+  (async-start
+   `(lambda ()
+      ,(async-inject-variables "\\(.*-agenda-file.*\\)\\|\\(load-path\\)")
+      (when pm-agenda-files-root
+        (require 'pm-agenda-files-loader)
+        (pm--load-agenda-files-from-file pm-agenda-files-root))
+      (org-agenda-files))
+   `(lambda (files)
+      (if (or (not files) (< (length files) 2))
+          (lwarn 'PM :warning "No agenda files loaded from file %s." pm-agenda-files-root)
+        (setq org-agenda-files files)
+        (message "Loaded %s agenda files." (length org-agenda-files)))
+      (let ((inhibit-debugger t))
+        (customize-save-variable 'org-agenda-files org-agenda-files)))))
 
 ;;;;; Agenda definitions
 (defun pm-entry-get-actors ()
