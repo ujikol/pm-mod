@@ -63,9 +63,9 @@ If nil org-agenda-files are handled the normal org-way.")
       (define-key org-mode-map (kbd "C-,") nil)
 
       (define-key org-mode-map (kbd "<S-M-return>") 'org-insert-heading-respect-content) ;; force new heading in e.g. list 
-      (define-key org-mode-map (kbd "M-c") 'org-copy-special )
-      (define-key org-mode-map (kbd "M-x") 'org-cut-special  )
-      (define-key org-mode-map (kbd "M-v") 'org-paste-special)
+      (define-key org-mode-map (kbd "M-c") 'pm-copy-special)
+      (define-key org-mode-map (kbd "M-x") 'pm-cut-special)
+      (define-key org-mode-map (kbd "M-v") 'pm-paste-special)
 
       (global-set-key (kbd "C-a") 'mark-whole-buffer)
       (global-set-key (kbd "M-a") 'org-mark-element)
@@ -928,6 +928,43 @@ This function is meant to be used in `org-cycle-hook'."
 	       (org-inlinetask-toggle-visibility)
          (org-inlinetask-goto-end)
          (backward-char))))))
+
+;; Patch cut/copy&paste of inline tasks
+(defun pm-cut-special ()
+  "Like org-cut-special but also works on inlinetask."
+  (interactive)
+  (if (not (eq 'inlinetask (save-excursion (org-back-to-heading t) (org-element-type (org-element-context)))))
+      (funcall-interactively 'org-cut-special)
+    (org-inlinetask-goto-beginning)
+    (let ((begin (point)))
+      (org-inlinetask-goto-end)
+      (kill-region begin (point))
+      (message "Cut: Inline Task"))))
+
+(defun pm-copy-special ()
+  "Like org-copy-special but also works on inlinetask."
+  (interactive)
+  (if (not (eq 'inlinetask (save-excursion (org-back-to-heading t) (org-element-type (org-element-context)))))
+      (funcall-interactively 'org-cut-special)
+    (org-inlinetask-goto-beginning)
+    (let ((begin (point)))
+      (org-inlinetask-goto-end)
+      (copy-region-as-kill begin (point))
+      (message "Copied: Inline Task"))))
+
+(defun pm-paste-special (arg)
+  "Like org-paste-special but also works on inlinetask."
+  (interactive "P")
+  (if (not (eq 'inlinetask
+               (with-temp-buffer
+                 (org-mode)
+                 (insert (current-kill 0 t))
+                 (goto-char (point-min))
+                 (org-element-type (org-element-context)))))
+      (funcall-interactively 'org-paste-special arg)
+    (unless (eq (point) (pos-bol))
+      (forward-line))
+    (yank)))
 
 ;; Auto number inline tasks; ACTION_ID_LEN property defines scope and format
 (defun pm-extract-task-id (task)
