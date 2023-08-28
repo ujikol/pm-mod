@@ -527,7 +527,6 @@ If nil org-agenda-files are handled the normal org-way.")
   (setq org-log-done 'time)
 
   (set-register ?a (cons 'file pm-agenda-files-root))
-  (set-register ?n (cons 'file  org-default-notes-file))
 
   (org-link-set-parameters "pmeval" :follow (lambda (link) (pm-eval-block link)) :face 'pm-action-face)
 
@@ -1123,11 +1122,14 @@ Links in archived branches are ignored. A link tagged with \"_notes\" is set as 
       (when pm-agenda-files-root
         (require 'pm-agenda-files-loader)
         (pm--load-agenda-files-from-file pm-agenda-files-root))
-      (org-agenda-files))
+      (cons org-default-notes-file org-agenda-files))
    `(lambda (files)
-      (if (or (not files) (< (length files) 2))
+      (if (or (not files) (< (length files) 3))
           (lwarn 'PM :warning "No agenda files loaded from file %s." pm-agenda-files-root)
-        (setq org-agenda-files files)
+        (when (car files)
+          (setq org-default-notes-file (car files)))
+        (set-register ?n (cons 'file  org-default-notes-file))
+        (setq org-agenda-files (cdr files))
         (message "Loaded %s agenda files." (length org-agenda-files)))
       (let ((inhibit-debugger t))
         (customize-save-variable 'org-agenda-files org-agenda-files)))))
