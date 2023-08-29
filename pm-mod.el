@@ -921,7 +921,7 @@ This function is meant to be used in `org-cycle-hook'."
   "Like org-copy-special but also works on inlinetask."
   (interactive)
   (if (not (eq 'inlinetask (save-excursion (org-back-to-heading t) (org-element-type (org-element-context)))))
-      (funcall-interactively 'org-cut-special)
+      (funcall-interactively 'org-copy-special)
     (org-inlinetask-goto-beginning)
     (let ((begin (point)))
       (org-inlinetask-goto-end)
@@ -1700,7 +1700,7 @@ Example:
 
 (defun pm-protocol (query)
   "Jump to org file (PATH) or project (PID) and optionally position at SEARCH.
-org-protocol://ct:/path=c:/path/file.org&search=*Heading"
+org-protocol://pm:/path=c:/path/file.org&search=*Heading"
   (let ((pars (org-protocol-convert-query-to-plist query)))
     (if (plist-get pars :pid)
         (pm-open-project (plist-get pars :pid))
