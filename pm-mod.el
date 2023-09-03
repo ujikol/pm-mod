@@ -14,6 +14,9 @@
 (defvar pm-mnemonic-key-bindings t
   "Whether to define mnemonic key bindings.")
 
+(defvar pm-hydra-key-bindings t
+  "Whether to define hydra key bindings.")
+
 (defvar pm-agenda-files-root "~/agenda_files.org"
   "Path of file to be parsed recursively for file links to org-agenda-files.
 If nil org-agenda-files are handled the normal org-way.")
@@ -28,7 +31,6 @@ If nil org-agenda-files are handled the normal org-way.")
 
 ;;;; Basic basics
 
-  
   (setq user-match-code (or user-match-code (getenv "match_code") user-login-name))
   
   (with-eval-after-load 'org
@@ -39,20 +41,39 @@ If nil org-agenda-files are handled the normal org-way.")
 
 ;;;; Editor
 
-    (when pm-mnemonic-key-bindings
-      (setq org-replace-disputed-keys t)
+;;;;; Hydra
 
+    ;;(setq pm-hydra-key-bindings t)
+    (when pm-hydra-key-bindings
+      (setq org-replace-disputed-keys t)
       (cua-mode t)
       (delete-selection-mode 1)
       (setq cua-auto-tabify-rectangles nil) ;; Don't tabify after rectangle commands
       (transient-mark-mode 1) ;; No region when it is not highlighted
       (setq cua-keep-region-after-copy t) ;; Standard Windows behaviour
+
+      (global-set-key (kbd "<apps>") 'pm-hydra-main/body)
+      (define-key org-mode-map (kbd "<apps>") 'pm-hydra-context-sensitive)
+      (define-key dired-mode-map (kbd "<apps>") 'pm-hydra-dired/body)
+      ;;(add-hook 'dired-mode-hook #'pm-hydra-dired/body)
+      (with-eval-after-load 'ibuffer
+        (define-key ibuffer-mode-map (kbd "<apps>") 'pm-hydra-ibuffer-main/body)))
+    
+;;;;; Mnemonics
+      
+    (when pm-mnemonic-key-bindings
+      (setq org-replace-disputed-keys t)
+      (cua-mode t)
+      (delete-selection-mode 1)
+      (setq cua-auto-tabify-rectangles nil) ;; Don't tabify after rectangle commands
+      (transient-mark-mode 1) ;; No region when it is not highlighted
+      (setq cua-keep-region-after-copy t) ;; Standard Windows behaviour
+      
       (define-key cua-global-keymap (kbd "C-S-<SPC>") nil)
       (define-key cua-global-keymap (kbd "<C-return>") nil)
       (define-key cua-global-keymap (kbd "M-y") nil)
       (define-key cua--cua-keys-keymap (kbd "M-v") nil)
       (define-key cua--rectangle-keymap (kbd "M-f") 'query-replace)
-      (define-key cua--rectangle-keymap (kbd "C-f") 'cua-fill-char-rectangle)
       (define-key cua--region-keymap (kbd "<C-return>") nil)
       (define-key cua-global-keymap (kbd "<C-return>") nil)
       (define-key org-mode-map (kbd "<C-return>") 'org-ctrl-c-ctrl-c)
@@ -96,10 +117,9 @@ If nil org-agenda-files are handled the normal org-way.")
 
       (global-set-key (kbd "C-+") (lambda () (interactive) (text-scale-adjust 1)))
       (global-set-key (kbd "C--") (lambda () (interactive) (text-scale-adjust -1)))
-      )
-;;;;; Cursor
 
-    (when pm-mnemonic-key-bindings
+;;;;;; Cursor
+
       (define-key org-mode-map (kbd "<home>") 'org-beginning-of-line)
       (define-key org-mode-map (kbd "<end>") 'org-end-of-line)
       (global-set-key (kbd "<C-prior>") 'outline-previous-visible-heading)
@@ -107,25 +127,22 @@ If nil org-agenda-files are handled the normal org-way.")
       (define-key org-mode-map (kbd "<C-backspace>") 'org-up-element)
       (global-set-key (kbd "C-.") 'recenter-top-bottom)
       (define-key org-mode-map (kbd "C-b") 'org-mark-ring-goto)
-      (define-key org-mode-map (kbd "M-b") 'org-mark-ring-push))
+      (define-key org-mode-map (kbd "M-b") 'org-mark-ring-push)
 
-;;;;; Clipboard
+;;;;;; Clipboard
 
-    (when pm-mnemonic-key-bindings
       (require 'browse-kill-ring)
-      (global-set-key (kbd "S-C-v") 'browse-kill-ring))
+      (global-set-key (kbd "S-C-v") 'browse-kill-ring)
 
-;;;;; Undo
+;;;;;; Undo
 
-    (when pm-mnemonic-key-bindings
       (require 'undo-fu)
       (global-set-key (kbd "C-z") 'undo-fu-only-undo)
-      (global-set-key (kbd "M-z") 'undo-fu-only-redo))
+      (global-set-key (kbd "M-z") 'undo-fu-only-redo)
       ;;(global-set-key (kbd "S-C-z") 'undo-tree-visualize)
 
-;;;;; Windows
+;;;;;; Windows
 
-    (when pm-mnemonic-key-bindings
       (global-set-key (kbd "<C-M-left>") 'windmove-left)
       (global-set-key (kbd "<C-M-right>") 'windmove-right)
       (global-set-key (kbd "<C-M-up>") 'windmove-up)
@@ -139,31 +156,30 @@ If nil org-agenda-files are handled the normal org-way.")
       (global-set-key (kbd "C-w 1") 'delete-other-windows)
       (require 'buffer-move)
       (global-set-key (kbd "C-w m") 'buf-move)
-      (define-key org-mode-map (kbd "M-w") 'visual-line-mode))
+      (define-key org-mode-map (kbd "C-M-t") 'toggle-truncate-lines)
 
-;;;;; Sessions
+;;;;;; Sessions
     
-    (when pm-mnemonic-key-bindings
-      (global-set-key (kbd "C-M-r") 'recover-session))
+      (global-set-key (kbd "C-M-r") 'recover-session)
 
-;;;;; DirEd
+;;;;;; Search replace
+
+      (global-set-key (kbd "C-f") 'swiper-isearch)
+      (global-set-key (kbd "M-f") 'query-replace)
+      (global-set-key (kbd "M-F") 'query-replace-regexp)
+
+;;;;;; Spell checking
     
-    (when pm-mnemonic-key-bindings
-      (with-eval-after-load 'dired
-        (define-key dired-mode-map (kbd "<C-return>") 'browse-url-of-dired-file)))
+      (with-eval-after-load "flyspell"
+        (define-key flyspell-mode-map (kbd "C-.") nil)
+        (define-key flyspell-mode-map (kbd "C-,") nil)
+        (define-key flyspell-mode-map (kbd "C-;") nil)
+        (define-key flyspell-mode-map (kbd "C-M-i") nil))
+      (global-set-key (kbd "M-?") 'ispell)
+      (global-set-key (kbd "C-?") 'ispell-word)
 
-;;;;; Git
+;;;;;; Buffers and files
 
-    (when pm-mnemonic-key-bindings
-      (global-set-key (kbd "C-M-g") 'magit-status)
-      (with-eval-after-load "magit"
-        (define-key magit-mode-map (kbd "p") 'magit-push)
-        (define-key with-editor-mode-map (kbd "<C-return>") 'with-editor-finish)
-        (define-key with-editor-mode-map (kbd "C-q") 'with-editor-cancel)))
-
-;;;;; Buffers and files
-
-    (when pm-mnemonic-key-bindings
       (require 'ibuf-ext)
       (global-set-key (kbd "C-M-b") 'ibuffer)
       (global-set-key (kbd "<f12>") (lambda () (interactive) (switch-to-buffer "*scratch*")))
@@ -174,9 +190,6 @@ If nil org-agenda-files are handled the normal org-way.")
       ;; does not work; changing key map for mode line is not allowed
       ;;(define-key mode-line-map (kbd "<wheel-down>") 'xah-next-user-buffer)
       ;;(define-key (mode-line-map "<wheel-up>") 'xah-previous-user-buffer)
-
-      (global-set-key (kbd "C-M-f") (lambda () (interactive) (dired (or (and (buffer-file-name) (f-dirname (buffer-file-name))) (f-expand "~")))))
-      (global-set-key (kbd "S-C-M-f") 'my-dired-recent-dirs)
       (global-set-key (kbd "C-o") 'counsel-find-file)
       (global-set-key (kbd "S-C-o") 'find-file-other-window)
       (global-set-key (kbd "M-o") 'pm-open-project)
@@ -185,25 +198,34 @@ If nil org-agenda-files are handled the normal org-way.")
       (global-set-key (kbd "<M-f4>") 'save-buffers-kill-terminal)
       (global-set-key (kbd "C-s") 'save-buffer)
       (global-set-key (kbd "M-s") 'save-some-buffers)
-      (global-set-key (kbd "C-j") 'jump-to-register))
+      (global-set-key (kbd "C-j") 'jump-to-register)
 
-;;;;; Search replace
+;;;;;; DirEd
 
-    (when pm-mnemonic-key-bindings
-      (global-set-key (kbd "C-f") 'swiper-isearch)
-      (global-set-key (kbd "M-f") 'query-replace)
-      (global-set-key (kbd "M-F") 'query-replace-regexp))
+      (require 'dired-recent)
+      (dired-recent-mode 1)
+      (setq dired-recent-max-directories nil)
+      (global-set-key (kbd "C-M-f") 'pm-dired-here)
+      (global-set-key (kbd "S-C-M-f") 'pm-dired-recent-dirs)
+      (with-eval-after-load 'dired
+        (define-key dired-mode-map (kbd "<C-return>") 'browse-url-of-dired-file))
 
-;;;;; Spell checking
-    
-    (when pm-mnemonic-key-bindings
-      (with-eval-after-load "flyspell"
-        (define-key flyspell-mode-map (kbd "C-.") nil)
-        (define-key flyspell-mode-map (kbd "C-,") nil)
-        (define-key flyspell-mode-map (kbd "C-;") nil)
-        (define-key flyspell-mode-map (kbd "C-M-i") nil))
-      (global-set-key (kbd "M-?") 'ispell)
-      (global-set-key (kbd "C-?") 'ispell-word))
+;;;;;; Git
+
+      (global-set-key (kbd "C-M-g") 'magit-status)
+      (with-eval-after-load "magit"
+        (define-key magit-mode-map (kbd "p") 'magit-push)
+        (define-key with-editor-mode-map (kbd "<C-return>") 'with-editor-finish)
+        (define-key with-editor-mode-map (kbd "C-q") 'with-editor-cancel))
+
+;;;;;; Other key bindings
+
+      (when (commandp 'counsel-M-x)
+        (global-set-key [remap execute-extended-command] #'counsel-M-x))
+      (global-set-key (kbd "C-M-x") (lambda () (interactive) (counsel-M-x "")))
+      (global-set-key (kbd "C-M-h") 'help)
+      (global-set-key (kbd "C-,") 'universal-argument)
+      (global-set-key (kbd "C-'") 'quoted-insert))
 
 ;;;; Files hierarchy
 
@@ -444,15 +466,6 @@ If nil org-agenda-files are handled the normal org-way.")
         (define-key ivy-minibuffer-map (kbd "TAB") 'ivy-partial))
       (define-key minibuffer-local-map (kbd "<tab>") 'company-complete))
 
-;;;; Other key bindings
-
-    (when pm-mnemonic-key-bindings
-      (when (commandp 'counsel-M-x)
-        (global-set-key [remap execute-extended-command] #'counsel-M-x))
-      (global-set-key (kbd "C-M-x") (lambda () (interactive) (counsel-M-x "")))
-      (global-set-key (kbd "C-M-h") 'help)
-      (global-set-key (kbd "C-,") 'universal-argument)
-      (global-set-key (kbd "C-'") 'quoted-insert))
 
 ;;;;; Context sensitive key bindings
     
@@ -464,7 +477,7 @@ If nil org-agenda-files are handled the normal org-way.")
       (add-hook 'org-metaup-hook 'ch/org-metaup-inlinetask t)
       (add-hook 'org-metadown-hook 'ch/org-metadown-inlinetask t)
       (define-key org-mode-map (kbd "<return>") 'pm-return)
-      (add-hook 'org-ctrl-c-ctrl-c-final-hook 'pm-before-ctrl-c-ctrl-c)
+      (add-hook 'org-ctrl-c-ctrl-c-hook 'pm-before-ctrl-c-ctrl-c)
       (define-key org-mode-map (kbd "<C-S-return>") 'pm-ctrl-shift-return)
       (add-hook 'org-metareturn-hook 'pm-meta-return)
       (define-key org-mode-map (kbd "<tab>") 'pm-tab)
@@ -473,34 +486,34 @@ If nil org-agenda-files are handled the normal org-way.")
       (define-key org-mode-map(kbd "<escape>") 'pm-keyboard-escape-quit))
       
 ;;;; Closing of Basic settings
-    ))
+    )
 ;;; Default settings
 
   (defun pm-set-defaults ()
-  "Set some options as recommended for pm-mod."
-  (setq org-startup-folded t
-        org-startup-indented t
-        org-list-indent-offset 1
-        org-hide-block-startup t
-        org-hide-emphasis-markers t
-        org-special-ctrl-a/e t ;; Beginning of line means after the stars
-        org-support-shift-select 'always
-        org-return-follows-link t
-        org-link-search-must-match-exact-headline nil
-        org-use-sub-superscripts nil
-        org-display-custom-times t
-        org-time-stamp-custom-formats '("<%Y-%m-%d>" . "<%Y-%m-%d %H:%M(%z)>"))
-  (setq initial-major-mode 'org-mode)
-  (setq org-fold-show-context-detail
-        '((default . ancestors)))
-  ;;      '((agenda . canonical) ; lineage has a bug not showing direct parent of inlinetask
-  ;;        (bookmark-jump . lineage)
-  ;;        (isearch . lineage)
-  ;;        (default . ancestors)))
-  (setq org-link-file-path-type 'relative)
-  (setq org-export-with-planning t)
-  (setq org-export-with-priority t)
-  (setq org-treat-S-cursor-todo-selection-as-state-change nil)
+    "Set some options as recommended for pm-mod."
+    (setq org-startup-folded t
+          org-startup-indented t
+          org-list-indent-offset 1
+          org-hide-block-startup t
+          org-hide-emphasis-markers t
+          org-special-ctrl-a/e t ;; Beginning of line means after the stars
+          org-support-shift-select 'always
+          org-return-follows-link t
+          org-link-search-must-match-exact-headline nil
+          org-use-sub-superscripts nil
+          org-display-custom-times t
+          org-time-stamp-custom-formats '("<%Y-%m-%d>" . "<%Y-%m-%d %H:%M(%z)>"))
+    (setq initial-major-mode 'org-mode)
+    (setq org-fold-show-context-detail
+          '((default . ancestors)))
+    ;;      '((agenda . canonical) ; lineage has a bug not showing direct parent of inlinetask
+    ;;        (bookmark-jump . lineage)
+    ;;        (isearch . lineage)
+    ;;        (default . ancestors)))
+    (setq org-link-file-path-type 'relative)
+    (setq org-export-with-planning t)
+    (setq org-export-with-priority t)
+    (setq org-treat-S-cursor-todo-selection-as-state-change nil)
 
 ;;;; Mouse
 
@@ -518,7 +531,7 @@ If nil org-agenda-files are handled the normal org-way.")
       (global-set-key (kbd "<mouse-5>") 'pm-scroll-up-n-lines)
       (global-set-key (kbd "<mouse-3>") 'jump-ispell-word))
 
-  )
+    ))
 
 ;;; Suggested settings
 
@@ -838,6 +851,469 @@ You should install the font Iosevka Term for a nicer appearance:
 ;;        ((equal (getenv "CT_CONTEXT") "WSL") 
 ;;         (shell-command (concat (executable-find "explorer.exe") " " (shell-quote-argument (ct-conv-path path t)))))))
 
+;;;; Hydra
+
+(require 'pretty-hydra)
+
+;;;;; Functions
+(defvar pm-hydra-stack nil)
+
+(defun pm-hydra-push (expr)
+  (push `(lambda () ,expr) pm-hydra-stack))
+
+(defun pm-hydra-pop ()
+  (interactive)
+  (funcall (or (pop pm-hydra-stack) 'pm-hydra-main/body)))
+
+(defun pm-hydra-context-sensitive ()
+  (interactive)
+  (cond
+   ((region-active-p)
+    (funcall 'pm-hydra-region/body))
+   ((org-at-heading-p)
+    (if (org-entry-get nil "TODO")
+        (funcall 'pm-hydra-task/body)
+        (funcall 'pm-hydra-heading/body)))
+   ((org-at-table-p)
+    (funcall 'pm-hydra-table/body))
+   (t (funcall 'pm-hydra-main/body))))
+
+;;;;; Main
+(pretty-hydra-define pm-hydra-main (:color teal)
+  (
+   ""
+   (
+    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-main/body))) "File/Buffer")
+    ("<f1>" ct-help "help (F1)")
+    ("Q" save-buffers-kill-terminal "Quit (S-C-A-q)")
+    ("<apps>" (setq pm-hydra-stack nil) "Exit")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit")
+    )
+   "Edit"
+   (
+    ("o" (when (derived-mode-p 'org-mode) (pm-hydra-outline/body) (pm-hydra-push '(pm-hydra-main/body))) "Outline")
+    ("h" (when (derived-mode-p 'org-mode) (pm-hydra-heading/body) (pm-hydra-push '(pm-hydra-main/body))) "Heading")
+    ("t" (when (derived-mode-p 'org-mode) (pm-hydra-task/body) (pm-hydra-push '(pm-hydra-main/body))) "Task")
+    ("d" org-timestamp-inactive "Date inactive")
+    ("D" org-timestamp "Date active")
+    ("T" (when (derived-mode-p 'org-mode) (unless (org-at-table-p) (if (org-region-active-p) (org-table-create-or-convert-from-region) (org-table-create))) (pm-hydra-table/body) (pm-hydra-push '(pm-hydra-main/body))) "Table")
+    ("SPC" (progn (pm-hydra-region/body) (unless (region-active-p) (call-interactively 'set-mark-command nil)) (pm-hydra-push '(pm-hydra-main/body))) "Region")
+    )
+   "Query/View"
+   (
+    ("g" pm-goto "Go to (C-g)")
+    ("f" swiper-isearch "Find (C-f)")
+    ("r" query-replace "Replace (A-f)")
+    ("R" query-replace-regexp "Replace with regex (S-A-f)")
+    ("<" (when (derived-mode-p 'org-mode) (call-interactively 'pm-focus)) "focus (C-<)")
+    (">" (when (derived-mode-p 'org-mode) (call-interactively 'org-toggle-narrow-to-subtree)) "narrow/widen (C->)")
+    ("/" (when (derived-mode-p 'org-mode) (call-interactively 'org-sparse-tree)) "filter view (C-/)")
+    ("v" (progn (pm-hydra-view/body) (pm-hydra-push '(pm-hydra-main/body))) "View settings")
+    )
+   "Extra"
+   (
+    ("a" org-agenda "Agenda (A-t)")
+    ("e" org-export-dispatch "Export (C-e)")
+    ("c" pm-capture "Capture/note (C-n)")
+    ("m" pm-refile "Move=refile branch (C-n)")
+    ("z" undo "undo (C-z)")
+    ("y" undo-fu-only-redo "redo (A-z)")
+    ("?" ispell-word "spell-check word (C-?)")
+    )
+   "Position"
+   (
+    ("B" org-mark-ring-push "store Bookmark (A-b)")
+    ("b" org-mark-ring-goto "jump to Bookmark (C-b)")
+    ("L" org-store-link "store Link (A-l)")
+    ("l" org-insert-link "insert/edit Link (C-l)")
+    ("<return>" pm-return "follow Link (Return)")
+    ("C-<return>" org-ctrl-c-ctrl-c "follow Link externally (C-Return)")
+    )
+   "Navigate"
+   (
+    ("<left>" left-word "word left (C-←)" :color red)
+    ("<right>" right-word "word right (C-→)" :color red)
+    ("<up>" (when (derived-mode-p 'org-mode) (call-interactively 'org-backward-paragraph)) "paragraph up (C-↑)" :color red)
+    ("<down>" (when (derived-mode-p 'org-mode) (call-interactively 'org-forward-paragraph)) "paragraph down (C-↓)" :color red)
+    ("<prior>" outline-previous-visible-heading "heading up (C-PgUp)" :color red)
+    ("<next>" outline-next-visible-heading "heading down (C-PgDown)" :color red)
+    ("<deletechar>" (when (derived-mode-p 'org-mode) (call-interactively 'org-up-element)) "go to parent (C-Backspace)" :color red)
+    ("." recenter-top-bottom "center current line (C-.)")
+    )
+   ))
+
+;;;;; Outline
+(pretty-hydra-define pm-hydra-outline (:color teal :title "Outline")
+  (
+   ""
+   (("<apps>" pm-hydra-pop "Back")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit"))
+   "Move Branch"
+   (
+    ("<left>" (when (derived-mode-p 'org-mode) (org-promote-subtree)) "promote (A-←)" :color red)
+    ("<right>" (when (derived-mode-p 'org-mode) (org-demote-subtree)) "demote (A-→)" :color red)
+    ("<up>" (when (derived-mode-p 'org-mode) (org-move-subtree-up)) "up (A-↑)" :color red)
+    ("<down>" (when (derived-mode-p 'org-mode) (org-move-subtree-down)) "down (A-↓)" :color red)
+    )
+   "Move Heading"
+   (
+    ("S-<left>" (when (derived-mode-p 'org-mode) (org-promote)) "promote (A-←)" :color red)
+    ("S-<right>" (when (derived-mode-p 'org-mode) (org-demote)) "demote (A-→)" :color red)
+    ("S-<up>" (when (derived-mode-p 'org-mode) (org-drag-line-backward)) "up (A-↑)" :color red)
+    ("S-<down>" (when (derived-mode-p 'org-mode) (org-drag-line-forward)) "down (A-↓)" :color red)
+    )
+   "Branch"
+   (
+    ("<return>" org-insert-heading "insert heading (A-Return)")
+    ("x" pm-cut-special "cut (A-x)")
+    ("c" pm-copy-special "copy (A-c)")
+    ("v" pm-paste-special "paste (A-v)")
+    )
+   ))
+
+;;;;; Heading
+(pretty-hydra-define pm-hydra-heading (:color teal)
+  (
+   ""
+   (
+    ("o" (when (derived-mode-p 'org-mode) (pm-hydra-outline/body) (pm-hydra-push '(pm-hydra-heading/body))) "Outline")
+    ("<apps>" pm-hydra-pop "Back")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit"))
+   "Heading"
+   (
+    ("c" (when (derived-mode-p 'org-mode) (call-interactively 'org-todo)) "Change status (C-t c)")
+    ("p" (when (derived-mode-p 'org-mode) (call-interactively 'org-set-property)) "Property (C-p)")
+    ("t" (when (derived-mode-p 'org-mode) (call-interactively 'pm-set-tags)) "Tags (C-t t)")
+    )
+   ))
+
+;;;;; Task
+(pretty-hydra-define pm-hydra-task (:color teal)
+  (
+   ""
+   (
+    ("h" (when (derived-mode-p 'org-mode) (pm-hydra-heading/body) (pm-hydra-push '(pm-hydra-task/body))) "Heading")
+    ("<apps>" pm-hydra-pop "Back")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit"))
+   "Task"
+   (
+    ("c" (when (derived-mode-p 'org-mode) (call-interactively 'org-todo)) "Change status (C-t c)")
+    ("i" (when (derived-mode-p 'org-mode) (call-interactively 'pm-convert-inlinetask)) "Inline task (C-t i)")
+    ("s" (when (derived-mode-p 'org-mode) (call-interactively 'org-schedule)) "Schedule (C-t s)")
+    ("S" (when (derived-mode-p 'org-mode) (call-interactively 'pm-schedule-remove)) "clear Schedule (C-t S)")
+    ("d" (when (derived-mode-p 'org-mode) (call-interactively 'org-deadline)) "Deadline (C-t d)")
+    ("D" (when (derived-mode-p 'org-mode) (call-interactively 'pm-deadline-remove)) "clear Deadline (C-t D)")
+    ("p" (when (derived-mode-p 'org-mode) (call-interactively 'org-priority)) "Priority (C-t p)")
+    ("a" (when (derived-mode-p 'org-mode) (pm-set-tags t)) "Assign (C-t t)")
+    )
+   ))
+
+;;;;; Date
+(pretty-hydra-define pm-hydra-date (:color teal :title "Date")
+  (
+   ""
+   (("<apps>" pm-hydra-pop "Back")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit"))
+   "Insert / Change"
+   (
+    ("i" org-time-stamp-inactive "Inactive time stamp")
+    ("a" org-time-stamp-active "Active time stamp")
+    )
+   ))
+
+;;;;; File
+(pretty-hydra-define pm-hydra-file (:color teal)
+  (
+   ""
+   (
+    ("b" ibuffer "Buffer Manager (C-A-b)")
+    ("f" pm-dired-here "File Manager here (C-A-f)")
+    ("F" pm-dired-recent-dires "File Manager select (S-C-A-f)")
+    ("G" magit-status "Git (C-A-g)")
+    ("R" recover-session "Recover session (C-A-r)")
+    ("<apps>" pm-hydra-pop "Back")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit")
+    )
+   "File / Buffer"
+   (
+    ("o" counsel-find-file "Open file (C-o)")
+    ("s" save-buffer "Save buffer (C-s)")
+    ("S" save-some-buffers "save All buffers (A-s)")
+    ("p" pm-open-project "open Project (A-o)")
+    ("n" ct-new-file "New project (C-A-n)")
+    ("q" kill-this-buffer "Quit buffer/file (C-q)")
+    )
+   "Switch"
+   (
+    ("<prior>" xah-previous-user-buffer "Previous (C-A PgUp)" :color red)
+    ("<next>" xah-next-user-buffer "Next (C-A PgDown)" :color red)
+    ("S-<prior>" xah-previous-emacs-buffer "Previous system buffer (S-C-A PgUp)" :color red)
+    ("S-<next>" xah-next-emacs-buffer "Next system buffer (S-C-A PgDown)" :color red)
+    ("j" jump-to-register "Jump to favorite file (C-j)")
+    )
+   ))
+
+;;;;; Region
+(pretty-hydra-define pm-hydra-region (:color pink :title "Region")
+  (
+   ""
+   (("<apps>" pm-hydra-pop "Back" :color blue)
+    ("<escape>" (setq pm-hydra-stack nil) "Exit" :color blue))
+   "Extend"
+   (
+    ("+" er/expand-region "extend region (C-Space)" :color red)
+    ("-" er/contract-region "contract region (S-C-Space)" :color red)
+    ("a" mark-whole-buffer "select All" :color red)
+    ("b" (when (derived-mode-p 'org-mode) (call-interactively 'org-mark-element)) "select Branch" :color red)
+    ("r" rectangle-mark-mode "Rectangular region (A-Space)" :color red)
+    ("SPC" (if (region-active-p) (exchange-point-and-mark) (call-interactively 'set-mark-command)) "Flip region" :color red)
+    )
+   "Clipboard"
+   (
+    ("x" (progn (call-interactively 'cua-cut-region) (deactivate-mark)) "cut region (C-x)")
+    ("c" (progn (call-interactively 'cua-copy-region) (deactivate-mark)) "copy region (C-c)")
+    ("C" (when (derived-mode-p 'org-mode) (call-interactively 'ox-clip-formatted-copy) (deactivate-mark)) "copy region (C-c)")
+    ("v" cua-paste "paste (C-v)")
+    ("V" browse-kill-ring "paste selectively (S-C-v)")
+    )
+   "Action"
+   (
+    ("?" ispell "check spelling (A-?)")
+    ("#" org-emphasize "format region (C-;)")
+    ("t" org-table-convert-region "convert region into Table (A-|)")
+    )
+   ))
+
+;;;;; Table
+(pretty-hydra-define pm-hydra-table (:color pink :title "Table"
+                                            ;; prevent interpretation of numeric and universal arguments
+                                            :base-map (make-sparse-keymap))
+  (
+   ""
+   (("<apps>" pm-hydra-pop "Back" :color blue)
+    ("<escape>" (setq pm-hydra-stack nil) "Exit" :color blue))
+   "Move"
+   (
+    ("<left>" org-metaleft "column left (C-←)" :color red)
+    ("<right>" org-metaright "column right (C-→)" :color red)
+    ("<up>" org-metaup "row up (C-↑)" :color red)
+    ("<down>" org-metadown "row down (C-↓)" :color red)
+    )
+   "Insert/Delete"
+   (
+    ("S-<left>" org-shiftmetaleft "delete column (S-A-←)" :color red)
+    ("S-<right>" org-shiftmetaright "insert column (S-A-→)" :color red)
+    ("S-<up>" org-shiftmetaup "delete row (S-A-↑)" :color red)
+    ("S-<down>" org-shiftmetadown "insert row (S-A-↓)" :color red)
+    )
+   "Extra"
+   (
+    ("-" org-table-insert-hline "horizontal line (C-__)")
+    ("+" org-edit-special "edit formula (C-#)")
+    ("#" org-table-toggle-coordinate-overlays "toggle coordinates overlay (A-#)")
+    ("<return>" org-ctrl-c-ctrl-c "update table (C-Return)")
+    )
+   "Text"
+   (
+    ("d" org-timestamp-inactive "Date inactive")
+    ("D" org-timestamp "Date active")
+    )
+   ))
+
+;;;;; View
+(pretty-hydra-define pm-hydra-view (:color teal :title "View")
+  (
+   ""
+   (
+    ("<apps>" pm-hydra-pop "Back")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit")
+    )
+   "Window navigation"
+   (
+    ("<left>" windmove-left "go to window Left (C-A-←)" :color red)
+    ("<right>" windmove-right "go to window Right (C-A-→)" :color red)
+    ("<up>" windmove-up "go to window Up (C-A-↑)" :color red)
+    ("<down>" windmove-down "go to window Down (C-A-↓)" :color red)
+    )
+   "Windows Layout"
+   (
+    ("h" split-window-below "Horizontally (C-w 2)")
+    ("v" split-window-right "Vertically (C-w 3)")
+    ("q" delete-window "Quit this window (C-w 0)")
+    ("k" delete-other-windows "Keep only this window (C-w 1)")
+    ("m" buf-move "Move window (C-w m)")
+    )
+   "Mode"
+   (
+    ("t" toggle-truncate-lines "toggle Truncate lines (C-A-t)")
+    ("+" (text-scale-increase 1) "zoom in (C-+)" :color red)
+    ("-" (text-scale-decrease 1) "zoom out (C--)" :color red)
+    ("=" (text-scale-increase 0) "zoom reset")
+    ("d" modus-themes-toggle "toggle Dark mode (C-A-d)")
+    )
+  ))
+
+;;;;; Dired
+(defhydra pm-hydra-dired (:hint nil :color pink)
+  "
+_+_ mkdir          _v_iew           _m_ark             _(_ details        _i_nsert-subdir    wdired
+_C_opy             _O_ view other   _U_nmark all       _)_ omit-mode      _$_ hide-subdir    C-x C-q : edit
+_D_elete           _o_pen other     _u_nmark           _l_ redisplay      _w_ kill-subdir    C-c C-c : commit
+_R_ename           _M_ chmod        _t_oggle           _g_ revert buf     _e_ ediff          C-c ESC : abort
+_Y_ rel symlink    _G_ chgrp        _E_xtension mark   _s_ort             _=_ pdiff
+_S_ymlink          ^ ^              _F_ind marked      ^ ^                _\\_ flyspell
+_r_sync            ^ ^              ^ ^                ^ ^                _?_ summary
+_z_ compress-file  _A_ find regexp
+_Z_ compress       _Q_ repl regexp
+
+T - tag prefix
+"
+  ("\\" dired-do-ispell)
+  ("(" dired-hide-details-mode)
+  (")" dired-omit-mode)
+  ("+" dired-create-directory)
+  ("=" diredp-ediff)         ;; smart diff
+  ("?" dired-summary)
+  ("$" diredp-hide-subdir-nomove)
+  ("A" dired-do-find-regexp)
+  ("C" dired-do-copy)        ;; Copy all marked files
+  ("D" dired-do-delete)
+  ("E" dired-mark-extension)
+  ("e" dired-ediff-files)
+  ("F" dired-do-find-marked-files)
+  ("G" dired-do-chgrp)
+  ("g" revert-buffer)        ;; read all directories again (refresh)
+  ("i" dired-maybe-insert-subdir)
+  ("l" dired-do-redisplay)   ;; relist the marked or singel directory
+  ("M" dired-do-chmod)
+  ("m" dired-mark)
+  ("O" dired-display-file)
+  ("o" dired-find-file-other-window)
+  ("Q" dired-do-find-regexp-and-replace)
+  ("R" dired-do-rename)
+  ("r" dired-do-rsynch)
+  ("S" dired-do-symlink)
+  ("s" dired-sort-toggle-or-edit)
+  ("t" dired-toggle-marks)
+  ("U" dired-unmark-all-marks)
+  ("u" dired-unmark)
+  ("v" dired-view-file)      ;; q to exit, s to search, = gets line #
+  ("w" dired-kill-subdir)
+  ("Y" dired-do-relsymlink)
+  ("z" diredp-compress-this-file)
+  ("Z" dired-do-compress)
+  ("<escape>" nil :color blue))
+
+;;;;; IBuffer
+(defhydra pm-hydra-ibuffer-main (:color pink :hint nil)
+"
+^Mark^         ^Actions^         ^View^          ^Select^              ^Navigation^
+_m_: mark      _D_: delete       _g_: refresh    _q_: quit             _RET_: visit
+_u_: unmark    _s_: save marked  _S_: sort       _TAB_: toggle         
+_*_: specific  _a_: all actions  _/_: filter     _o_: other window
+_t_: toggle    ^ ^               _H_: help       C-o other win no-select
+"
+("m" ibuffer-mark-forward)
+("u" ibuffer-unmark-forward)
+("*" pm-hydra-ibuffer-mark/body :color blue)
+("t" ibuffer-toggle-marks)
+
+("D" ibuffer-do-delete)
+("s" ibuffer-do-save)
+("a" pm-hydra-ibuffer-action/body :color blue)
+
+("g" ibuffer-update)
+("S" pm-hydra-ibuffer-sort/body :color blue)
+("/" pm-hydra-ibuffer-filter/body :color blue)
+("H" describe-mode :color blue)
+
+("RET" ibuffer-visit-buffer :color blue)
+
+("TAB" ibuffer-toggle-filter-group)
+
+("o" ibuffer-visit-buffer-other-window :color blue)
+("q" quit-window :color blue)
+("<escape>" nil :color blue))
+
+(defhydra pm-hydra-ibuffer-mark (:color teal :columns 5
+                                        :after-exit (pm-hydra-ibuffer-main/body))
+  "Mark"
+  ("*" ibuffer-unmark-all "unmark all")
+  ("M" ibuffer-mark-by-mode "mode")
+  ("m" ibuffer-mark-modified-buffers "modified")
+  ("u" ibuffer-mark-unsaved-buffers "unsaved")
+  ("s" ibuffer-mark-special-buffers "special")
+  ("r" ibuffer-mark-read-only-buffers "read-only")
+  ("/" ibuffer-mark-dired-buffers "dired")
+  ("e" ibuffer-mark-dissociated-buffers "dissociated")
+  ("h" ibuffer-mark-help-buffers "help")
+  ("z" ibuffer-mark-compressed-file-buffers "compressed")
+  ("b" pm-hydra-ibuffer-main/body "back" :color blue))
+
+(defhydra pm-hydra-ibuffer-action (:color teal :columns 4
+                                          :after-exit
+                                          (if (eq major-mode 'ibuffer-mode)
+                                              (pm-hydra-ibuffer-main/body)))
+  "Action"
+  ("A" ibuffer-do-view "view")
+  ("E" ibuffer-do-eval "eval")
+  ("F" ibuffer-do-shell-command-file "shell-command-file")
+  ("I" ibuffer-do-query-replace-regexp "query-replace-regexp")
+  ("H" ibuffer-do-view-other-frame "view-other-frame")
+  ("N" ibuffer-do-shell-command-pipe-replace "shell-cmd-pipe-replace")
+  ("M" ibuffer-do-toggle-modified "toggle-modified")
+  ("O" ibuffer-do-occur "occur")
+  ("P" ibuffer-do-print "print")
+  ("Q" ibuffer-do-query-replace "query-replace")
+  ("R" ibuffer-do-rename-uniquely "rename-uniquely")
+  ("T" ibuffer-do-toggle-read-only "toggle-read-only")
+  ("U" ibuffer-do-replace-regexp "replace-regexp")
+  ("V" ibuffer-do-revert "revert")
+  ("W" ibuffer-do-view-and-eval "view-and-eval")
+  ("X" ibuffer-do-shell-command-pipe "shell-command-pipe")
+  ("<escape>" nil "back"))
+
+(defhydra pm-hydra-ibuffer-sort (:color amaranth :columns 3)
+  "Sort"
+  ("i" ibuffer-invert-sorting "invert")
+  ("a" ibuffer-do-sort-by-alphabetic "alphabetic")
+  ("v" ibuffer-do-sort-by-recency "recently used")
+  ("s" ibuffer-do-sort-by-size "size")
+  ("f" ibuffer-do-sort-by-filename/process "filename")
+  ("m" ibuffer-do-sort-by-major-mode "mode")
+  ("<escape>" pm-hydra-ibuffer-main/body "back" :color blue))
+
+(defhydra pm-hydra-ibuffer-filter (:color amaranth :columns 4)
+  "Filter"
+  ("m" ibuffer-filter-by-used-mode "mode")
+  ("M" ibuffer-filter-by-derived-mode "derived mode")
+  ("n" ibuffer-filter-by-name "name")
+  ("c" ibuffer-filter-by-content "content")
+  ("e" ibuffer-filter-by-predicate "predicate")
+  ("f" ibuffer-filter-by-filename "filename")
+  (">" ibuffer-filter-by-size-gt "size")
+  ("<" ibuffer-filter-by-size-lt "size")
+  ("/" ibuffer-filter-disable "disable")
+  ("<escape>" pm-hydra-ibuffer-main/body "back" :color blue))
+
+;;;; DirEd
+
+(defun pm-dired-recent-dirs ()
+  "Present a list of recently used directories and open the selected one in dired"
+  (interactive)
+  (let ((dir (ivy-read "Directory: "
+                       dired-recent-directories
+                       :re-builder #'ivy--regex
+                       :sort nil
+                       :initial-input nil)))
+    (dired dir)))
+
+(defun pm-dired-here ()
+  "Open dired for the directory of the current buffer file."
+  (interactive)
+  (dired (or (and (buffer-file-name) (f-dirname (buffer-file-name)))
+             (f-expand "~"))))
+
 ;;;; Files hierarchy
 
 (defun org-entry-get-recursively-advice (oldfun pom property &optional inherit literal-nil)
@@ -869,10 +1345,10 @@ You should install the font Iosevka Term for a nicer appearance:
 (setq org-hierarchical-todo-statistics nil)
 (setq org-provide-todo-statistics '(("JOB" "TODO" "WAITING") ("DONE")))
 
-(defun pm-set-tags()
+(defun pm-set-tags(&optional assignment)
   (interactive)
   (minibuffer-with-setup-hook 'pm-minibuffer-mode
-    (org-set-tags (read-from-minibuffer "Tags/Actors:\n" (org-make-tag-string (org-get-tags nil t))))))
+    (org-set-tags (read-from-minibuffer "Tags/Actors:\n" (s-join ":" (or (org-get-tags nil t) (and assignment '("@"))))))))
 
 (defun pm-schedule-remove () (interactive) (org-schedule `(4)))
 (defun pm-deadline-remove () (interactive) (org-deadline `(4)))
@@ -1677,14 +2153,32 @@ Example:
 (defun pm-project-id ()
   (or (--any (org-entry-get nil (nth 2 it) t) pm-project-id-types) (org-entry-get nil "PROJECT_ID" t)))
 
+(defun pm-collect-loaded-projects ()
+  (--filter
+   (car it)
+   (-flatten-n 1
+    (--map
+     (with-current-buffer it
+       (let ((file (buffer-file-name)))
+       (when (and file (derived-mode-p 'org-mode))
+         (--map
+          (cons (org-entry-get nil it t) file)
+          (-concat (--map (nth 2 it) pm-project-id-types) '("PROJECT_ID"))))))
+     (buffer-list)))))
+
 (defun pm-open-project (project-id)
   "Try to open a file by project number."
-  (interactive (list (read-string "Enter a project code: " nil nil (thing-at-point 'symbol))))
-  (condition-case nil
-      (find-file (and (pm-assured-valid-project-id-type project-id) (pm-project-file project-id)))
-    (error
-     (user-error "Cannot open project file: %s" file)))
-  nil)
+  (interactive (list (ivy-read "Enter a project code: "
+                               (--map (car it) (pm-collect-loaded-projects))
+                               :initial-input (let ((pid (thing-at-point 'symbol)))
+                                                (and (pm-project-id-type pid) pid)))))
+  (pm-assured-valid-project-id-type project-id)
+  (let ((file (or (cdr (--first (s-equals? project-id (car it)) (pm-collect-loaded-projects)))
+                  (pm-project-file project-id))))
+    (if (f-file? file)
+        (find-file file)
+      (user-error "Cannot open project file: %s" file))
+    nil))
 
 ;;;; Links and protocol
 (defun pm--link-open-expand-advice (oldfun link &optional arg)
@@ -2527,6 +3021,7 @@ The value of the `Links' field specify other issues to which the new issue will 
   (cond ((org-at-heading-p)
          (org-promote-subtree)
          t)))
+
 (defun pm-metaright ()
   (interactive)
   (cond ((org-at-heading-p)
@@ -2540,6 +3035,7 @@ The value of the `Links' field specify other issues to which the new issue will 
   (cond ((org-at-heading-p)
          (org-do-promote)
          t)))
+
 (defun pm-shiftmetaright ()
   (interactive)
   (cond ((org-at-heading-p)
@@ -2614,9 +3110,9 @@ The value of the `Links' field specify other issues to which the new issue will 
       (when (and tags (string-match ":taskjuggler_project:" tags))
         (pm-taskjuggle)
         t)))
-   ;; edit tags when in task
+   ;; edit tags as actor when in task
    ((and (org-at-heading-p) (org-entry-get nil "TODO"))
-    (pm-set-tags)
+    (pm-set-tags t)
     t)
    ;; recalculate table
    ((org-at-table-p)
