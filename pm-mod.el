@@ -873,7 +873,7 @@ You should install the font Iosevka Term for a nicer appearance:
    ((org-at-heading-p)
     (if (org-entry-get nil "TODO")
         (funcall 'pm-hydra-task/body)
-        (funcall 'pm-hydra-heading/body)))
+        (funcall 'pm-hydra-outline/body)))
    ((org-at-table-p)
     (funcall 'pm-hydra-table/body))
    (t (funcall 'pm-hydra-main/body))))
@@ -883,16 +883,15 @@ You should install the font Iosevka Term for a nicer appearance:
   (
    ""
    (
-    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-main/body))) "File/Buffer")
-    ("<f1>" ct-help "help (F1)")
     ("Q" save-buffers-kill-terminal "Quit (S-C-A-q)")
+    ("<f1>" ct-help "help (F1)")
+    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-main/body))) "File/Buffer")
     ("<apps>" (setq pm-hydra-stack nil) "Exit")
     ("<escape>" (setq pm-hydra-stack nil) "Exit")
     )
    "Edit"
    (
     ("o" (when (derived-mode-p 'org-mode) (pm-hydra-outline/body) (pm-hydra-push '(pm-hydra-main/body))) "Outline")
-    ("h" (when (derived-mode-p 'org-mode) (pm-hydra-heading/body) (pm-hydra-push '(pm-hydra-main/body))) "Heading")
     ("t" (when (derived-mode-p 'org-mode) (pm-hydra-task/body) (pm-hydra-push '(pm-hydra-main/body))) "Task")
     ("d" org-timestamp-inactive "Date inactive")
     ("D" org-timestamp "Date active")
@@ -915,7 +914,7 @@ You should install the font Iosevka Term for a nicer appearance:
     ("a" org-agenda "Agenda (A-t)")
     ("e" org-export-dispatch "Export (C-e)")
     ("c" pm-capture "Capture/note (C-n)")
-    ("m" pm-refile "Move=refile branch (C-n)")
+    ("m" pm-refile "Move=refile branch (C-r)")
     ("z" undo "undo (C-z)")
     ("y" undo-fu-only-redo "redo (A-z)")
     ("?" ispell-word "spell-check word (C-?)")
@@ -946,8 +945,17 @@ You should install the font Iosevka Term for a nicer appearance:
 (pretty-hydra-define pm-hydra-outline (:color teal :title "Outline")
   (
    ""
-   (("<apps>" pm-hydra-pop "Back")
-    ("<escape>" (setq pm-hydra-stack nil) "Exit"))
+   (
+    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-outline/body))) "File/Buffer")
+    ("<apps>" pm-hydra-pop "Back")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit")
+    )
+   "Change"
+   (
+    ("s" (when (derived-mode-p 'org-mode) (call-interactively 'org-todo)) "set Status (C-t c)")
+    ("p" (when (derived-mode-p 'org-mode) (call-interactively 'org-set-property)) "Property (C-p)")
+    ("t" (when (derived-mode-p 'org-mode) (call-interactively 'pm-set-tags)) "Tags (C-t t)")
+    )
    "Move Branch"
    (
     ("<left>" (when (derived-mode-p 'org-mode) (org-promote-subtree)) "promote (A-←)" :color red)
@@ -968,34 +976,21 @@ You should install the font Iosevka Term for a nicer appearance:
     ("x" pm-cut-special "cut (A-x)")
     ("c" pm-copy-special "copy (A-c)")
     ("v" pm-paste-special "paste (A-v)")
-    )
-   ))
-
-;;;;; Heading
-(pretty-hydra-define pm-hydra-heading (:color teal)
-  (
-   ""
-   (
-    ("o" (when (derived-mode-p 'org-mode) (pm-hydra-outline/body) (pm-hydra-push '(pm-hydra-heading/body))) "Outline")
-    ("<apps>" pm-hydra-pop "Back")
-    ("<escape>" (setq pm-hydra-stack nil) "Exit"))
-   "Heading"
-   (
-    ("c" (when (derived-mode-p 'org-mode) (call-interactively 'org-todo)) "Change status (C-t c)")
-    ("p" (when (derived-mode-p 'org-mode) (call-interactively 'org-set-property)) "Property (C-p)")
-    ("t" (when (derived-mode-p 'org-mode) (call-interactively 'pm-set-tags)) "Tags (C-t t)")
+    ("m" pm-refile "Move=refile branch (C-r)")
     )
    ))
 
 ;;;;; Task
-(pretty-hydra-define pm-hydra-task (:color teal)
+(pretty-hydra-define pm-hydra-task (:color teal :title "Task")
   (
    ""
    (
-    ("h" (when (derived-mode-p 'org-mode) (pm-hydra-heading/body) (pm-hydra-push '(pm-hydra-task/body))) "Heading")
+    ("o" (when (derived-mode-p 'org-mode) (pm-hydra-outline/body) (pm-hydra-push '(pm-hydra-task/body))) "Outline")
+    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-task/body))) "File/Buffer")
     ("<apps>" pm-hydra-pop "Back")
-    ("<escape>" (setq pm-hydra-stack nil) "Exit"))
-   "Task"
+    ("<escape>" (setq pm-hydra-stack nil) "Exit")
+    )
+   "Change"
    (
     ("c" (when (derived-mode-p 'org-mode) (call-interactively 'org-todo)) "Change status (C-t c)")
     ("i" (when (derived-mode-p 'org-mode) (call-interactively 'pm-convert-inlinetask)) "Inline task (C-t i)")
@@ -1022,19 +1017,23 @@ You should install the font Iosevka Term for a nicer appearance:
    ))
 
 ;;;;; File
-(pretty-hydra-define pm-hydra-file (:color teal)
+(pretty-hydra-define pm-hydra-file (:color teal :title "File & Buffer")
   (
    ""
+   (
+    ("<apps>" pm-hydra-pop "Back")
+    ("<return>" (setq pm-hydra-stack nil) "Exit")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit")
+    )
+   "Tool"
    (
     ("b" ibuffer "Buffer Manager (C-A-b)")
     ("f" pm-dired-here "File Manager here (C-A-f)")
     ("F" pm-dired-recent-dires "File Manager select (S-C-A-f)")
     ("G" magit-status "Git (C-A-g)")
     ("R" recover-session "Recover session (C-A-r)")
-    ("<apps>" pm-hydra-pop "Back")
-    ("<escape>" (setq pm-hydra-stack nil) "Exit")
     )
-   "File / Buffer"
+   "File"
    (
     ("o" counsel-find-file "Open file (C-o)")
     ("s" save-buffer "Save buffer (C-s)")
@@ -1057,7 +1056,9 @@ You should install the font Iosevka Term for a nicer appearance:
 (pretty-hydra-define pm-hydra-region (:color pink :title "Region")
   (
    ""
-   (("<apps>" pm-hydra-pop "Back" :color blue)
+   (
+    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-region/body))) "File/Buffer" :color blue)
+    ("<apps>" pm-hydra-pop "Back" :color blue)
     ("<escape>" (setq pm-hydra-stack nil) "Exit" :color blue))
    "Extend"
    (
@@ -1090,7 +1091,9 @@ You should install the font Iosevka Term for a nicer appearance:
                                             :base-map (make-sparse-keymap))
   (
    ""
-   (("<apps>" pm-hydra-pop "Back" :color blue)
+   (
+    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-table/body))) "File/Buffer" :color blue)
+    ("<apps>" pm-hydra-pop "Back" :color blue)
     ("<escape>" (setq pm-hydra-stack nil) "Exit" :color blue))
    "Move"
    (
@@ -1125,6 +1128,7 @@ You should install the font Iosevka Term for a nicer appearance:
   (
    ""
    (
+    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-view/body))) "File/Buffer")
     ("<apps>" pm-hydra-pop "Back")
     ("<escape>" (setq pm-hydra-stack nil) "Exit")
     )
