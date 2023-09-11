@@ -2672,43 +2672,111 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                       (-partition 2 pm-msteams-properties))))
 
 ;;;;; Jira
+;; Better than using libjira2 because:
+;; - support bearer authentication
+;; - option to run async
+;; - debug option
+;; - supports all field at ticket (issue) creation
+;; - support org formatting for description field
+;; - support ticket creation from org subtree
 
 (require 'ox-confluence)
-
 (defvar pm-jira-url nil "Base URL of Jira")
 (defvar pm-jira-debug nil
   "t for *Request Response* buffer and deug messages. 'local for local httpbin.
-(docker run -p 80:80 kennethreitz/httpbin)")
+;;(docker run -p 80:80 kennethreitz/httpbin)")
+(defvar pm-jira-auth 'bearer
+  "Method of authentication. 'bearer, 'basic, 'token or 'cookie")
 (defvar pm-jira-user nil "User to use to authenticate against Jira.")
-(defvar pm-jira-get-token (lambda () (ignore-errors (s-trim (f-read-text pm-jira-credentials-file))))
-  "Function which provides token for authentication.")
-(defvar pm-jira-renew-token (lambda ()
-                              (message "Jira credentials are not set or expired. Let's renew them.")
+(defvar pm-jira-bearer-token-file nil "Path of file to store bearer token in.")
+(defvar pm-jira-get-bearer-token (lambda () (ignore-errors (s-trim (f-read-text pm-jira-bearer-token-file))))
+  "Function which provides bearer token for authentication.")
+(defvar pm-jira-renew-bearer-token (lambda ()
+                              (interactive)
+                              (unless (eq pm-jira-auth 'bearer)
+                                (user-error "pm-jira-auth needs to be set to 'bearer for personal access token based authentication"))
+                              (message "Jira token is not set or expired. Let's renew it.")
                               (let (token)
                                 (while (not (eq 13 (read-char "I'm going to open a Jira page. Please create a new token there, copy it to the clipboard, and return here. Press Return now."))))
                                 (org-link-open-from-string (concat pm-jira-url "secure/ViewProfile.jspa?selectedTab=com.atlassian.pats.pats-plugin:jira-user-personal-access-tokens"))
                                 (setq token (read-from-minibuffer "Paste the token here: "))
-                                (f-write-text token 'dos pm-jira-credentials-file)
+                                (f-write-text token 'dos pm-jira-bearer-token-file)
                                 (message "New Jira token stored.")
                                 token))
-  "Function which renews the token. Is called when `pm-jira-get-token returns nil, or request fails due to authentication error.")
+  "Function which renews the token. Is called when `pm-jira-get-bearer-token returns nil.")
+(defvar pm-jira--session nil)
+;;(setq pm-jira-debug t)
 
-(defun pm-jira-via-browser (action fields)
-  "Create or view Jira ticket via deep link."
-  (pm-open-externally
-   (print
-    (pm-expand-string
-     (concat pm-jira-url
-             (cond ((eq action 'query) "/issues/?")
-                   ((eq action 'create) "/secure/CreateIssueDetails!init.jspa?")
-                   (t (user-error "Incorrect action: %s." action)))
-             (mapconcat (lambda (pair) (format "%s=%s" (car pair) (cadr pair)))
-                        fields "&"))))))
+(defun pm-jira-session-login (&optional failed username password token)
+  "Login to JIRA with USERNAME and PASSWORD. Save cookie in `pm-jira--session'."
+  (interactive)
+  (setq pm-jira--session
+        (let* ((username (or username
+                             (eq pm-jira-auth 'bearer)
+                             pm-jira-user
+                             (read-string "Username: ")))
+               (password (or password
+                             (member pm-jira-auth '(bearer token))
+                             (read-passwd (format "Password or token for user %s: " username)))))
+          (cond ((member pm-jira-auth '(basic token))
+                 (base64-encode-string (format "%s:%s" username password) t))
+                ((eq pm-jira-auth 'bearer)
+                 (let ((token (funcall pm-jira-get-bearer-token)))
+                   (while (not token)
+                     (unless (yes-or-no-p "First you need to get an authentication personal access token from Jira. Create token?")
+                       (user-error "Cannot proceed without renewed token."))
+                     (funcall pm-jira-renew-bearer-token)
+                     (setq token (funcall pm-jira-get-bearer-token)))
+                   token))
+                ((eq pm-jira-auth 'cookie)
+                 (let* ((json-array-type 'list)
+                        (reply-data
+                         (request (concat pm-jira-url "/rest/auth/1/session")
+                           :type "POST"
+                           :headers `(("Content-Type" . "application/json"))
+                           :parser 'json-read
+                           :sync t
+                           :data (json-encode `((username . ,username)
+                                                (password . ,password)))))
+                        (status-code (request-response-status-code reply-data))
+                        (auth-info (cdar (jiralib2--verify-status reply-data)))
+                        (session-token (format "%s=%s"
+                                               (cdr (assoc 'name auth-info))
+                                               (cdr (assoc 'value auth-info)))))
+                   session-token))))))
+
+(defun jiralib2--verify-status (response)
+  "Check status code of RESPONSE, return data or throw an error."
+  (let ((status-code (request-response-status-code response)))
+    (cond ((not status-code)
+           (user-error "Request failed: Could not reach the server"))
+
+          ((= status-code 401)
+           (user-error "Request failed: invalid password"))
+
+          ;; Several failed password attempts require you to answer
+          ;; a captcha, that must be done in the browser.
+          ((= status-code 403)
+           (user-error "Login denied: please login in the browser"))
+
+          ((= status-code 404)
+           (user-error "Request failed: Wrong URL path"))
+
+          ((and (>= status-code 400) (< status-code 500))
+           (user-error "Request failed: invalid request: %s"
+                       (request-response-data response)))
+
+          ((>= status-code 500)
+           (error "Request failed: Server error"))
+
+          ;; status codes 200 - 399 should be ok.
+          (t (request-response-data response)))))
 
 (cl-defun pm-jira-request (method endpoint &key data sync success error arguments-to-response)
   "Calls API2 on ENDPOINT on `pm-jira-url\\='. For most other parameter see `request\\='."
-  (let (;(request-curl-options '("--cacert ~/Sec-Root-CA.pem"))
-        (method (upcase (symbol-name method)))
+  (unless pm-jira--session
+    (pm-jira-session-login))
+  (let ((method (upcase (symbol-name method)))
         (endpoint (if (eq pm-jira-debug 'local)
                       (concat "http://localhost/" (downcase (symbol-name method)))
                     (concat pm-jira-url "rest/api/2/" endpoint)))
@@ -2718,20 +2786,18 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
     (when pm-jira-debug
       (message "Requesting %s with data:\n%s." endpoint data))
     (request endpoint
-      :user (unless pm-jira-get-token pm-jira-user)
+      :user (unless pm-jira-get-bearer-token pm-jira-user)
       :sync sync
       :type method
       :data data
-      :headers (-concat (and pm-jira-get-token
-                             `(("Authorization" .
-                                ,(format "Bearer %s"
-                                         (let ((token (funcall pm-jira-get-token)))
-                                           (while (not token)
-                                             (unless (yes-or-no-p "First you need to get an authentication token from Jira. Create token?")
-                                               (user-error "Cannot proceed without renewed token."))
-                                             (funcall pm-jira-renew-token)
-                                             (setq token (funcall pm-jira-get-token)))
-                                           token)))))
+      :headers (-concat (and pm-jira-get-bearer-token
+                             (cond ((eq pm-jira-auth 'cookie)
+                                    `(( "cookie" . ,pm-jira--session)))
+                                   ((eq pm-jira-auth 'bearer)
+                                    `(("Authorization" .
+                                       ,(format "Bearer %s" pm-jira--session))))
+                                   ((member pm-jira-auth '(basic token))
+                                    `(("Authorization" . ,(format "Basic %s" pm-jira--session))))))
                         (and data '(("Content-Type" . "application/json"))))
       :parser (if pm-jira-debug
                   (lambda ()
@@ -2749,13 +2815,14 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                                           (setq result data)
                                           (message "Request succeeded."))))
       :error (or error (cl-function (lambda (&key error-thrown &allow-other-keys)
-                                      (when (eq 401 (caddr error-thrown))
-                                        (when (yes-or-no-p "Request failed at authentication. Do you want to renew the token?")
-                                          (funcall pm-jira-renew-token)
-                                          (user-error "Retry now!")))
+                                      (message "XXX1 %s" error-thrown)
+                                      (condition-case nil
+                                          (when (eq 401 (caddr error-thrown))
+                                            (setq pm-jira--session nil))
+                                        (error nil))
                                       (error "Request failed: %s" (cdr error-thrown))))))
     result))
-
+ 
 (defmacro pm-jira-build-definition-retrieval (entity-type &rest body)
   "Build function to retrieve and cache a certain Jira entity type definition."
   (let ((cache-symbol (intern (concat "pm--jira-" (downcase entity-type) "s")))
@@ -2772,7 +2839,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                                                     (setq ,cache-symbol (progn ,@body))
                                                     (setq ,pull-date-symbol (calendar-current-date))))))
          ,cache-symbol))))
-
+ 
 (pm-jira-build-definition-retrieval
  "project"
  (--map
@@ -2780,14 +2847,14 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
         (cdr (assoc 'id it))
         (cdr (assoc 'name it)))
   data))
-
+ 
 (pm-jira-build-definition-retrieval
  "issuetype"
  (--map
   (list (cdr (assoc 'name it))
         (cdr (assoc 'id it)))
   data))
-
+ 
 (pm-jira-build-definition-retrieval
  "field"
  (--map
@@ -2795,7 +2862,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
         (cdr (assoc 'id it))
         (or (ignore-errors (number-to-string (cdr (assoc 'customId (cdr (assoc 'schema it)))))) (cdr (assoc 'name it))))
   data))
-
+ 
 (pm-jira-build-definition-retrieval
  "issueLinkType"
  (--map
@@ -2804,7 +2871,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
         (cdr (assoc 'inward it))
         (cdr (assoc 'outward it)))
   (cdar data)))
-
+ 
 (cl-defun pm-jira-query (query &key fields expand sync success error)
   "Query using JQL."
   (let ((data `(("jql" . ,query)))
@@ -2813,7 +2880,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                      :data data
                      :sync sync)
     result))
-
+ 
 (defun pm-jira-create-link (ticket1-key ticket2-key &optional type-name)
   "Link a Jira ticket to another."
   (let* ((link-data `(("type" . (("name" . ,(or type-name "Relates")))) ("inwardIssue" . (("key" . ,ticket1-key))) ("outwardIssue" . (("key" . ,ticket2-key)))))
@@ -2830,7 +2897,7 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
           (message "Link created: %s" link-data)
         (message "Link creation failed:%s" link-data)))
     succeeded))
-
+ 
 (defun pm-jira-create-ticket (project-key issuetype-name data &optional links)
   "Create a Jira ticket optionally linked to existing tickets.
 Links is a list of lists, each consisting of inwardissue, outwardissue and optionally type. nil represents the place of the issue to be created.
@@ -2908,7 +2975,19 @@ The value of the `Links' field specify other issues to which the new issue will 
                   (user-error "FAILED! %s" key)))
     (kill-new key)
     (push (list (concat pm-jira-url "browse/" key) key) org-stored-links)
-    (message "Created ticket %s. Yoe can paste the key and use Ctrl-L to insert link." key)))
+    (message "Created ticket %s. You can paste the key and use Ctrl-L to insert link." key)))
+
+(defun pm-jira-via-browser (action fields)
+  "Create or view Jira ticket via deep link."
+  (pm-open-externally
+   (print
+    (pm-expand-string
+     (concat pm-jira-url
+             (cond ((eq action 'query) "/issues/?")
+                   ((eq action 'create) "/secure/CreateIssueDetails!init.jspa?")
+                   (t (user-error "Incorrect action: %s." action)))
+             (mapconcat (lambda (pair) (format "%s=%s" (car pair) (cadr pair)))
+                        fields "&"))))))
 
 ;;;; Completion
 
