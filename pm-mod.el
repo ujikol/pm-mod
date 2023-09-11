@@ -53,7 +53,8 @@ If nil org-agenda-files are handled the normal org-way.")
       (setq cua-keep-region-after-copy t) ;; Standard Windows behaviour
 
       (global-set-key (kbd "<apps>") 'pm-hydra-main/body)
-      (define-key org-mode-map (kbd "<apps>") 'pm-hydra-context-sensitive)
+      (define-key org-mode-map (kbd "<apps>") nil)
+      (define-key org-mode-map (kbd "S-<apps>") 'pm-hydra-context-sensitive)
       (define-key dired-mode-map (kbd "<apps>") 'pm-hydra-dired/body)
       ;;(add-hook 'dired-mode-hook #'pm-hydra-dired/body)
       (with-eval-after-load 'ibuffer
@@ -883,7 +884,7 @@ You should install the font Iosevka Term for a nicer appearance:
   (
    ""
    (
-    ("Q" save-buffers-kill-terminal "Quit (S-C-A-q)")
+    ("Q" save-buffers-kill-terminal "Quit (S-C-M-q)")
     ("<f1>" ct-help "help (F1)")
     ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-main/body))) "File/Buffer")
     ("<apps>" (setq pm-hydra-stack nil) "Exit")
@@ -891,6 +892,7 @@ You should install the font Iosevka Term for a nicer appearance:
     )
    "Edit"
    (
+    ("v" yank "paste (C-v)")
     ("o" (when (derived-mode-p 'org-mode) (pm-hydra-outline/body) (pm-hydra-push '(pm-hydra-main/body))) "Outline")
     ("t" (when (derived-mode-p 'org-mode) (pm-hydra-task/body) (pm-hydra-push '(pm-hydra-main/body))) "Task")
     ("d" org-timestamp-inactive "Date inactive")
@@ -902,28 +904,30 @@ You should install the font Iosevka Term for a nicer appearance:
    (
     ("g" pm-goto "Go to (C-g)")
     ("f" swiper-isearch "Find (C-f)")
-    ("r" query-replace "Replace (A-f)")
-    ("R" query-replace-regexp "Replace with regex (S-A-f)")
+    ("r" query-replace "Replace (M-f)")
+    ("R" query-replace-regexp "Replace with regex (S-M-f)")
     ("<" (when (derived-mode-p 'org-mode) (call-interactively 'pm-focus)) "focus (C-<)")
     (">" (when (derived-mode-p 'org-mode) (call-interactively 'org-toggle-narrow-to-subtree)) "narrow/widen (C->)")
     ("/" (when (derived-mode-p 'org-mode) (call-interactively 'org-sparse-tree)) "filter view (C-/)")
-    ("v" (progn (pm-hydra-view/body) (pm-hydra-push '(pm-hydra-main/body))) "View settings")
+    ("w" (progn (pm-hydra-view/body) (pm-hydra-push '(pm-hydra-main/body))) "Window/view settings")
     )
    "Extra"
    (
-    ("a" org-agenda "Agenda (A-t)")
+    ("a" org-agenda "Agenda (M-t)")
     ("e" org-export-dispatch "Export (C-e)")
     ("c" pm-capture "Capture/note (C-n)")
     ("m" pm-refile "Move=refile branch (C-r)")
+    ("J" pm-hydra-jira/body "Jira")
     ("z" undo "undo (C-z)")
-    ("y" undo-fu-only-redo "redo (A-z)")
+    ("y" undo-fu-only-redo "redo (M-z)")
     ("?" ispell-word "spell-check word (C-?)")
     )
    "Position"
    (
-    ("B" org-mark-ring-push "store Bookmark (A-b)")
+    ("j" jump-to-register "Jump to favorite file (C-j)")
+    ("B" org-mark-ring-push "store Bookmark (M-b)")
     ("b" org-mark-ring-goto "jump to Bookmark (C-b)")
-    ("L" org-store-link "store Link (A-l)")
+    ("L" org-store-link "store Link (M-l)")
     ("l" org-insert-link "insert/edit Link (C-l)")
     ("<return>" pm-return "follow Link (Return)")
     ("C-<return>" org-ctrl-c-ctrl-c "follow Link externally (C-Return)")
@@ -955,27 +959,30 @@ You should install the font Iosevka Term for a nicer appearance:
     ("s" (when (derived-mode-p 'org-mode) (call-interactively 'org-todo)) "set Status (C-t c)")
     ("p" (when (derived-mode-p 'org-mode) (call-interactively 'org-set-property)) "Property (C-p)")
     ("t" (when (derived-mode-p 'org-mode) (call-interactively 'pm-set-tags)) "Tags (C-t t)")
+    ("d" org-timestamp-inactive "Date inactive")
+    ("D" org-timestamp "Date active")
+    ("l" org-insert-link "insert/edit Link (C-l)")
     )
    "Move Branch"
    (
-    ("<left>" (when (derived-mode-p 'org-mode) (org-promote-subtree)) "promote (A-←)" :color red)
-    ("<right>" (when (derived-mode-p 'org-mode) (org-demote-subtree)) "demote (A-→)" :color red)
-    ("<up>" (when (derived-mode-p 'org-mode) (org-move-subtree-up)) "up (A-↑)" :color red)
-    ("<down>" (when (derived-mode-p 'org-mode) (org-move-subtree-down)) "down (A-↓)" :color red)
+    ("<left>" (when (derived-mode-p 'org-mode) (org-promote-subtree)) "promote (M-←)" :color red)
+    ("<right>" (when (derived-mode-p 'org-mode) (org-demote-subtree)) "demote (M-→)" :color red)
+    ("<up>" (when (derived-mode-p 'org-mode) (org-move-subtree-up)) "up (M-↑)" :color red)
+    ("<down>" (when (derived-mode-p 'org-mode) (org-move-subtree-down)) "down (M-↓)" :color red)
     )
    "Move Heading"
    (
-    ("S-<left>" (when (derived-mode-p 'org-mode) (org-promote)) "promote (A-←)" :color red)
-    ("S-<right>" (when (derived-mode-p 'org-mode) (org-demote)) "demote (A-→)" :color red)
-    ("S-<up>" (when (derived-mode-p 'org-mode) (org-drag-line-backward)) "up (A-↑)" :color red)
-    ("S-<down>" (when (derived-mode-p 'org-mode) (org-drag-line-forward)) "down (A-↓)" :color red)
+    ("S-<left>" (when (derived-mode-p 'org-mode) (org-promote)) "promote (M-←)" :color red)
+    ("S-<right>" (when (derived-mode-p 'org-mode) (org-demote)) "demote (M-→)" :color red)
+    ("S-<up>" (when (derived-mode-p 'org-mode) (org-drag-line-backward)) "up (M-↑)" :color red)
+    ("S-<down>" (when (derived-mode-p 'org-mode) (org-drag-line-forward)) "down (M-↓)" :color red)
     )
    "Branch"
    (
-    ("<return>" org-insert-heading "insert heading (A-Return)")
-    ("x" pm-cut-special "cut (A-x)")
-    ("c" pm-copy-special "copy (A-c)")
-    ("v" pm-paste-special "paste (A-v)")
+    ("<return>" org-insert-heading "insert heading (M-Return)")
+    ("x" pm-cut-special "cut (M-x)")
+    ("c" pm-copy-special "copy (M-c)")
+    ("v" pm-paste-special "paste (M-v)")
     ("m" pm-refile "Move=refile branch (C-r)")
     )
    ))
@@ -1022,32 +1029,32 @@ You should install the font Iosevka Term for a nicer appearance:
    ""
    (
     ("<apps>" pm-hydra-pop "Back")
-    ("<return>" (setq pm-hydra-stack nil) "Exit")
     ("<escape>" (setq pm-hydra-stack nil) "Exit")
+    ("<return>" (setq pm-hydra-stack nil) "Exit")
     )
    "Tool"
    (
-    ("b" ibuffer "Buffer Manager (C-A-b)")
-    ("f" pm-dired-here "File Manager here (C-A-f)")
-    ("F" pm-dired-recent-dires "File Manager select (S-C-A-f)")
-    ("G" magit-status "Git (C-A-g)")
-    ("R" recover-session "Recover session (C-A-r)")
+    ("b" ibuffer "Buffer Manager (C-M-b)")
+    ("f" pm-dired-here "File Manager here (C-M-f)")
+    ("F" pm-dired-recent-dires "File Manager select (S-C-M-f)")
+    ("G" magit-status "Git (C-M-g)")
+    ("R" recover-session "Recover session (C-M-r)")
     )
    "File"
    (
     ("o" counsel-find-file "Open file (C-o)")
     ("s" save-buffer "Save buffer (C-s)")
-    ("S" save-some-buffers "save All buffers (A-s)")
-    ("p" pm-open-project "open Project (A-o)")
-    ("n" ct-new-file "New project (C-A-n)")
+    ("S" save-some-buffers "save All buffers (M-s)")
+    ("p" pm-open-project "open Project (M-o)")
+    ("n" ct-new-file "New project (C-M-n)")
     ("q" kill-this-buffer "Quit buffer/file (C-q)")
     )
    "Switch"
    (
-    ("<prior>" xah-previous-user-buffer "Previous (C-A PgUp)" :color red)
-    ("<next>" xah-next-user-buffer "Next (C-A PgDown)" :color red)
-    ("S-<prior>" xah-previous-emacs-buffer "Previous system buffer (S-C-A PgUp)" :color red)
-    ("S-<next>" xah-next-emacs-buffer "Next system buffer (S-C-A PgDown)" :color red)
+    ("<left>" xah-previous-user-buffer "Previous (C-A PgUp)" :color red)
+    ("<right>" xah-next-user-buffer "Next (C-A PgDown)" :color red)
+    ("<up>" xah-previous-emacs-buffer "Previous system buffer (S-C-A PgUp)" :color red)
+    ("<down>" xah-next-emacs-buffer "Next system buffer (S-C-A PgDown)" :color red)
     ("j" jump-to-register "Jump to favorite file (C-j)")
     )
    ))
@@ -1066,7 +1073,7 @@ You should install the font Iosevka Term for a nicer appearance:
     ("-" er/contract-region "contract region (S-C-Space)" :color red)
     ("a" mark-whole-buffer "select All" :color red)
     ("b" (when (derived-mode-p 'org-mode) (call-interactively 'org-mark-element)) "select Branch" :color red)
-    ("r" rectangle-mark-mode "Rectangular region (A-Space)" :color red)
+    ("r" rectangle-mark-mode "Rectangular region (M-Space)" :color red)
     ("SPC" (if (region-active-p) (exchange-point-and-mark) (call-interactively 'set-mark-command)) "Flip region" :color red)
     )
    "Clipboard"
@@ -1079,9 +1086,10 @@ You should install the font Iosevka Term for a nicer appearance:
     )
    "Action"
    (
-    ("?" ispell "check spelling (A-?)")
+    ("?" ispell "check spelling (M-?)")
     ("#" org-emphasize "format region (C-;)")
-    ("t" org-table-convert-region "convert region into Table (A-|)")
+    ("t" org-table-convert-region "convert region into Table (M-|)")
+    ("l" org-insert-link "insert/edit Link (C-l)")
     )
    ))
 
@@ -1092,7 +1100,7 @@ You should install the font Iosevka Term for a nicer appearance:
   (
    ""
    (
-    ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-table/body))) "File/Buffer" :color blue)
+    ;;("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-table/body))) "File/Buffer" :color blue)
     ("<apps>" pm-hydra-pop "Back" :color blue)
     ("<escape>" (setq pm-hydra-stack nil) "Exit" :color blue))
    "Move"
@@ -1104,22 +1112,29 @@ You should install the font Iosevka Term for a nicer appearance:
     )
    "Insert/Delete"
    (
-    ("S-<left>" org-shiftmetaleft "delete column (S-A-←)" :color red)
-    ("S-<right>" org-shiftmetaright "insert column (S-A-→)" :color red)
-    ("S-<up>" org-shiftmetaup "delete row (S-A-↑)" :color red)
-    ("S-<down>" org-shiftmetadown "insert row (S-A-↓)" :color red)
+    ("S-<left>" org-shiftmetaleft "delete column (S-M-←)" :color red)
+    ("S-<right>" org-shiftmetaright "insert column (S-M-→)" :color red)
+    ("S-<up>" org-shiftmetaup "delete row (S-M-↑)" :color red)
+    ("S-<down>" org-shiftmetadown "insert row (S-M-↓)" :color red)
+    )
+   "Cursor"
+   (
+    ("M-<left>" left-char "left (C-←)" :color red)
+    ("M-<right>" right-char "right (C-→)" :color red)
+    ("M-<up>" previous-line "up (C-↑)" :color red)
+    ("M-<down>" next-line "down (C-↓)" :color red)
     )
    "Extra"
    (
-    ("-" org-table-insert-hline "horizontal line (C-__)")
+    ("_" org-table-insert-hline "horizontal line (C-__)")
     ("+" org-edit-special "edit formula (C-#)")
-    ("#" org-table-toggle-coordinate-overlays "toggle coordinates overlay (A-#)")
+    ("#" org-table-toggle-coordinate-overlays "toggle coordinates overlay (M-#)")
     ("<return>" org-ctrl-c-ctrl-c "update table (C-Return)")
     )
    "Text"
    (
-    ("d" org-timestamp-inactive "Date inactive")
-    ("D" org-timestamp "Date active")
+    ("C-d" org-timestamp-inactive "Date inactive")
+    ("M-d" org-timestamp "Date active")
     )
    ))
 
@@ -1134,26 +1149,26 @@ You should install the font Iosevka Term for a nicer appearance:
     )
    "Window navigation"
    (
-    ("<left>" windmove-left "go to window Left (C-A-←)" :color red)
-    ("<right>" windmove-right "go to window Right (C-A-→)" :color red)
-    ("<up>" windmove-up "go to window Up (C-A-↑)" :color red)
-    ("<down>" windmove-down "go to window Down (C-A-↓)" :color red)
+    ("<left>" windmove-left "go to window Left (C-M-←)" :color red)
+    ("<right>" windmove-right "go to window Right (C-M-→)" :color red)
+    ("<up>" windmove-up "go to window Up (C-M-↑)" :color red)
+    ("<down>" windmove-down "go to window Down (C-M-↓)" :color red)
     )
    "Windows Layout"
    (
     ("h" split-window-below "Horizontally (C-w 2)")
     ("v" split-window-right "Vertically (C-w 3)")
     ("q" delete-window "Quit this window (C-w 0)")
-    ("k" delete-other-windows "Keep only this window (C-w 1)")
+    ("1" delete-other-windows "only this 1 window (C-w 1)")
     ("m" buf-move "Move window (C-w m)")
     )
    "Mode"
    (
-    ("t" toggle-truncate-lines "toggle Truncate lines (C-A-t)")
+    ("t" toggle-truncate-lines "toggle Truncate lines (C-M-t)")
     ("+" (text-scale-increase 1) "zoom in (C-+)" :color red)
     ("-" (text-scale-decrease 1) "zoom out (C--)" :color red)
     ("=" (text-scale-increase 0) "zoom reset")
-    ("d" modus-themes-toggle "toggle Dark mode (C-A-d)")
+    ("d" modus-themes-toggle "toggle Dark mode (C-M-d)")
     )
   ))
 
