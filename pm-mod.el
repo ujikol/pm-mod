@@ -820,7 +820,7 @@ You should install the font Iosevka Term for a nicer appearance:
     (when (save-excursion
             (search-backward "consider M-x recover-this-file" nil t))
       (message "\n\n-------------------------------------------------------------")
-      (message "There are auto-saved files. Consider recover-session (C-A-r).")
+      (message "There are auto-saved files. Consider recover-session (C-M-r).")
       (message "-------------------------------------------------------------")))
 
   (server-start)
@@ -945,6 +945,43 @@ You should install the font Iosevka Term for a nicer appearance:
     )
    ))
 
+;;;;; File
+(pretty-hydra-define pm-hydra-file (:color teal :title "File & Buffer")
+  (
+   ""
+   (
+    ("<tab>" (progn (pm-dired-here) (pm-hydra-dired/body)) "File Manager here (C-M-f)")
+    ("<apps>" pm-hydra-pop "Back")
+    ("<escape>" (setq pm-hydra-stack nil) "Exit")
+    ("<return>" (setq pm-hydra-stack nil) "Exit")
+    )
+   "Tool"
+   (
+    ("b" ibuffer "Buffer Manager (C-M-b)")
+    ("f" (progn (pm-dired-recent-dirs) (pm-hydra-dired/body)) "File Manager select (S-C-M-f)")
+    ("G" magit-status "Git (C-M-g)")
+    ("R" recover-session "Recover session (C-M-r)")
+    ("e" org-export-dispatch "Export (C-e)")
+    )
+   "File"
+   (
+    ("o" counsel-find-file "Open file (C-o)")
+    ("s" save-buffer "Save buffer (C-s)")
+    ("S" save-some-buffers "save All buffers (M-s)")
+    ("p" pm-open-project "open Project (M-o)")
+    ("n" ct-new-file "New project (C-M-n)")
+    ("q" kill-this-buffer "Quit buffer/file (C-q)")
+    )
+   "Switch"
+   (
+    ("<left>" xah-previous-user-buffer "Previous (C-M-PgUp)" :color red)
+    ("<right>" xah-next-user-buffer "Next (C-M-PgDown)" :color red)
+    ("<up>" xah-previous-emacs-buffer "Previous system buffer (S-C-M-PgUp)" :color red)
+    ("<down>" xah-next-emacs-buffer "Next system buffer (S-C-M-PgDown)" :color red)
+    ("j" jump-to-register "Jump to favorite file (C-j)")
+    )
+   ))
+
 ;;;;; Outline
 (pretty-hydra-define pm-hydra-outline (:color teal :title "Outline")
   (
@@ -1020,42 +1057,6 @@ You should install the font Iosevka Term for a nicer appearance:
    (
     ("i" org-time-stamp-inactive "Inactive time stamp")
     ("a" org-time-stamp-active "Active time stamp")
-    )
-   ))
-
-;;;;; File
-(pretty-hydra-define pm-hydra-file (:color teal :title "File & Buffer")
-  (
-   ""
-   (
-    ("<apps>" pm-hydra-pop "Back")
-    ("<escape>" (setq pm-hydra-stack nil) "Exit")
-    ("<return>" (setq pm-hydra-stack nil) "Exit")
-    )
-   "Tool"
-   (
-    ("b" ibuffer "Buffer Manager (C-M-b)")
-    ("f" pm-dired-here "File Manager here (C-M-f)")
-    ("F" pm-dired-recent-dires "File Manager select (S-C-M-f)")
-    ("G" magit-status "Git (C-M-g)")
-    ("R" recover-session "Recover session (C-M-r)")
-    )
-   "File"
-   (
-    ("o" counsel-find-file "Open file (C-o)")
-    ("s" save-buffer "Save buffer (C-s)")
-    ("S" save-some-buffers "save All buffers (M-s)")
-    ("p" pm-open-project "open Project (M-o)")
-    ("n" ct-new-file "New project (C-M-n)")
-    ("q" kill-this-buffer "Quit buffer/file (C-q)")
-    )
-   "Switch"
-   (
-    ("<left>" xah-previous-user-buffer "Previous (C-A PgUp)" :color red)
-    ("<right>" xah-next-user-buffer "Next (C-A PgDown)" :color red)
-    ("<up>" xah-previous-emacs-buffer "Previous system buffer (S-C-A PgUp)" :color red)
-    ("<down>" xah-next-emacs-buffer "Next system buffer (S-C-A PgDown)" :color red)
-    ("j" jump-to-register "Jump to favorite file (C-j)")
     )
    ))
 
@@ -1173,55 +1174,47 @@ You should install the font Iosevka Term for a nicer appearance:
   ))
 
 ;;;;; Dired
-(defhydra pm-hydra-dired (:hint nil :color pink)
-  "
-_+_ mkdir          _v_iew           _m_ark             _(_ details        _i_nsert-subdir    wdired
-_C_opy             _O_ view other   _U_nmark all       _)_ omit-mode      _$_ hide-subdir    C-x C-q : edit
-_D_elete           _o_pen other     _u_nmark           _l_ redisplay      _w_ kill-subdir    C-c C-c : commit
-_R_ename           _M_ chmod        _t_oggle           _g_ revert buf     _e_ ediff          C-c ESC : abort
-_Y_ rel symlink    _G_ chgrp        _E_xtension mark   _s_ort             _=_ pdiff
-_S_ymlink          ^ ^              _F_ind marked      ^ ^                _\\_ flyspell
-_r_sync            ^ ^              ^ ^                ^ ^                _?_ summary
-_z_ compress-file  _A_ find regexp
-_Z_ compress       _Q_ repl regexp
-
-T - tag prefix
-"
-  ("\\" dired-do-ispell)
-  ("(" dired-hide-details-mode)
-  (")" dired-omit-mode)
-  ("+" dired-create-directory)
-  ("=" diredp-ediff)         ;; smart diff
-  ("?" dired-summary)
-  ("$" diredp-hide-subdir-nomove)
-  ("A" dired-do-find-regexp)
-  ("C" dired-do-copy)        ;; Copy all marked files
-  ("D" dired-do-delete)
-  ("E" dired-mark-extension)
-  ("e" dired-ediff-files)
-  ("F" dired-do-find-marked-files)
-  ("G" dired-do-chgrp)
-  ("g" revert-buffer)        ;; read all directories again (refresh)
-  ("i" dired-maybe-insert-subdir)
-  ("l" dired-do-redisplay)   ;; relist the marked or singel directory
-  ("M" dired-do-chmod)
-  ("m" dired-mark)
-  ("O" dired-display-file)
-  ("o" dired-find-file-other-window)
-  ("Q" dired-do-find-regexp-and-replace)
-  ("R" dired-do-rename)
-  ("r" dired-do-rsynch)
-  ("S" dired-do-symlink)
-  ("s" dired-sort-toggle-or-edit)
-  ("t" dired-toggle-marks)
-  ("U" dired-unmark-all-marks)
-  ("u" dired-unmark)
-  ("v" dired-view-file)      ;; q to exit, s to search, = gets line #
-  ("w" dired-kill-subdir)
-  ("Y" dired-do-relsymlink)
-  ("z" diredp-compress-this-file)
-  ("Z" dired-do-compress)
-  ("<escape>" nil :color blue))
+(pretty-hydra-define pm-hydra-dired (:color pink)
+  (
+   ""
+   (
+    ("<apps>" nil "Menu" :color red)
+    ("<escape>" quit-window "Exit" :color blue)
+    )
+   "Action"
+   (
+    ("r" dired-do-rename "Rename/move")
+    ("c" dired-do-copy "Copy")
+    ("d" dired-do-delete "Delete")
+    ("z" dired-do-compress "compress")
+    ("s" dired-create-directory "create Subdir")
+    )
+   "Open"
+   (
+    ("<return>" dired-find-file "open" :color red)
+    ("C-<return>" browse-url-of-dired-file "open externally" :color red)
+    ("o" dired-find-file-other-window "Open in other window" :color red)
+    ("v" dired-view-file "View")
+    ("R" revert-buffer "Refresh")
+    ("C" dired-copy-filename-as-kill "Copy names")
+    )
+   "Select"
+   (
+    ("m" dired-mark "Mark")
+    ("u" dired-unmark "Unmark")
+    ("U" dired-unmark-all-marks "Unmark all")
+    ("t" dired-toggle-marks "Toggle")
+    ("M" dired-mark-files-regexp "Mark regexp")
+    )
+   "Search/View"
+   (
+    ("f" dired-isearch-filenames "Find name")
+    ("F" dired-do-find-regexp "Find regex")
+    ("g" find-grep-dired "find with Grep")
+    ("i" dired-number-of-marked-files "Info")
+    ("D" dired-hide-details-mode "Details")
+    )
+   ))
 
 ;;;;; IBuffer
 (defhydra pm-hydra-ibuffer-main (:color pink :hint nil)
