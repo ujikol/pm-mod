@@ -206,6 +206,9 @@ If nil org-agenda-files are handled the normal org-way.")
       (require 'dired-recent)
       (dired-recent-mode 1)
       (setq dired-recent-max-directories nil)
+      (require 'dired-quick-sort)
+      (setq ls-lisp-use-insert-directory-program t)
+      (dired-quick-sort-setup)
       (global-set-key (kbd "C-M-f") 'pm-dired-here)
       (global-set-key (kbd "S-C-M-f") 'pm-dired-recent-dirs)
       (with-eval-after-load 'dired
@@ -882,7 +885,7 @@ You should install the font Iosevka Term for a nicer appearance:
 ;;;;; Main
 (pretty-hydra-define pm-hydra-main (:color teal)
   (
-   ""
+   "MAIN"
    (
     ("Q" save-buffers-kill-terminal "Quit (S-C-M-q)")
     ("<f1>" ct-help "help (F1)")
@@ -915,7 +918,7 @@ You should install the font Iosevka Term for a nicer appearance:
    (
     ("a" org-agenda "Agenda (M-t)")
     ("e" org-export-dispatch "Export (C-e)")
-    ("c" pm-capture "Capture/note (C-n)")
+    ("n" pm-capture "Note=capture (C-n)")
     ("m" pm-refile "Move=refile branch (C-r)")
     ("J" pm-hydra-jira/body "Jira")
     ("z" undo "undo (C-z)")
@@ -946,9 +949,9 @@ You should install the font Iosevka Term for a nicer appearance:
    ))
 
 ;;;;; File
-(pretty-hydra-define pm-hydra-file (:color teal :title "File & Buffer")
+(pretty-hydra-define pm-hydra-file (:color teal)
   (
-   ""
+   "FILE & BUFFER"
    (
     ("<tab>" (progn (pm-dired-here) (pm-hydra-dired/body)) "File Manager here (C-M-f)")
     ("<apps>" pm-hydra-pop "Back")
@@ -962,6 +965,7 @@ You should install the font Iosevka Term for a nicer appearance:
     ("G" magit-status "Git (C-M-g)")
     ("R" recover-session "Recover session (C-M-r)")
     ("e" org-export-dispatch "Export (C-e)")
+    ("w" (progn (pm-hydra-view/body) (pm-hydra-push '(pm-hydra-file/body))) "Window/view settings")
     )
    "File"
    (
@@ -983,9 +987,9 @@ You should install the font Iosevka Term for a nicer appearance:
    ))
 
 ;;;;; Outline
-(pretty-hydra-define pm-hydra-outline (:color teal :title "Outline")
+(pretty-hydra-define pm-hydra-outline (:color teal)
   (
-   ""
+   "OUTLINE"
    (
     ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-outline/body))) "File/Buffer")
     ("<apps>" pm-hydra-pop "Back")
@@ -1025,9 +1029,9 @@ You should install the font Iosevka Term for a nicer appearance:
    ))
 
 ;;;;; Task
-(pretty-hydra-define pm-hydra-task (:color teal :title "Task")
+(pretty-hydra-define pm-hydra-task (:color teal)
   (
-   ""
+   "TASK"
    (
     ("o" (when (derived-mode-p 'org-mode) (pm-hydra-outline/body) (pm-hydra-push '(pm-hydra-task/body))) "Outline")
     ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-task/body))) "File/Buffer")
@@ -1048,9 +1052,9 @@ You should install the font Iosevka Term for a nicer appearance:
    ))
 
 ;;;;; Date
-(pretty-hydra-define pm-hydra-date (:color teal :title "Date")
+(pretty-hydra-define pm-hydra-date (:color teal)
   (
-   ""
+   "DATE"
    (("<apps>" pm-hydra-pop "Back")
     ("<escape>" (setq pm-hydra-stack nil) "Exit"))
    "Insert / Change"
@@ -1061,9 +1065,9 @@ You should install the font Iosevka Term for a nicer appearance:
    ))
 
 ;;;;; Region
-(pretty-hydra-define pm-hydra-region (:color pink :title "Region")
+(pretty-hydra-define pm-hydra-region (:color pink)
   (
-   ""
+   "REGION"
    (
     ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-region/body))) "File/Buffer" :color blue)
     ("<apps>" pm-hydra-pop "Back" :color blue)
@@ -1095,11 +1099,11 @@ You should install the font Iosevka Term for a nicer appearance:
    ))
 
 ;;;;; Table
-(pretty-hydra-define pm-hydra-table (:color pink :title "Table"
+(pretty-hydra-define pm-hydra-table (:color pink
                                             ;; prevent interpretation of numeric and universal arguments
                                             :base-map (make-sparse-keymap))
   (
-   ""
+   "TABLE"
    (
     ;;("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-table/body))) "File/Buffer" :color blue)
     ("<apps>" pm-hydra-pop "Back" :color blue)
@@ -1140,9 +1144,9 @@ You should install the font Iosevka Term for a nicer appearance:
    ))
 
 ;;;;; View
-(pretty-hydra-define pm-hydra-view (:color teal :title "View")
+(pretty-hydra-define pm-hydra-view (:color teal)
   (
-   ""
+   "VIEW"
    (
     ("<tab>" (progn (pm-hydra-file/body) (pm-hydra-push '(pm-hydra-view/body))) "File/Buffer")
     ("<apps>" pm-hydra-pop "Back")
@@ -1176,10 +1180,12 @@ You should install the font Iosevka Term for a nicer appearance:
 ;;;;; Dired
 (pretty-hydra-define pm-hydra-dired (:color pink)
   (
-   ""
+   "FILE MANAGER"
    (
+    ("<tab>" pm-dired-recent-dirs "change path")
+    ("<escape>" (progn (setq pm-hydra-stack nil) (pm-hydra-main/body)) "Main" :color blue)
     ("<apps>" nil "Menu" :color red)
-    ("<escape>" quit-window "Exit" :color blue)
+    ("q" (progn (quit-window) (when (derived-mode-p 'dired-mode) (pm-hydra-dired/body))) "Exit" :color blue)
     )
    "Action"
    (
@@ -1191,12 +1197,12 @@ You should install the font Iosevka Term for a nicer appearance:
     )
    "Open"
    (
-    ("<return>" dired-find-file "open" :color red)
-    ("C-<return>" browse-url-of-dired-file "open externally" :color red)
-    ("o" dired-find-file-other-window "Open in other window" :color red)
-    ("v" dired-view-file "View")
+    ("<return>" dired-find-file "open" :color blue)
+    ("C-<return>" browse-url-of-dired-file "open externally" :color blue)
+    ("o" dired-find-file-other-window "Open in other window" :color blue)
+    ("v" dired-view-file "View" :color blue)
     ("R" revert-buffer "Refresh")
-    ("C" dired-copy-filename-as-kill "Copy names")
+    ("C" (funcall-interactively 'dired-copy-filename-as-kill 0) "Copy paths")
     )
    "Select"
    (
@@ -1208,13 +1214,21 @@ You should install the font Iosevka Term for a nicer appearance:
     )
    "Search/View"
    (
-    ("f" dired-isearch-filenames "Find name")
-    ("F" dired-do-find-regexp "Find regex")
-    ("g" find-grep-dired "find with Grep")
+    ("f" (progn (add-hook 'dired-isearch-filenames-mode-hook #'pm-hydra--dired-isearch-end-hook nil t) (dired-isearch-filenames)) "Find name" :color blue)
+    ("F" dired-do-find-regexp "Find regex" :color blue)
+    ("g" find-grep-dired "find with Grep" :color blue)
     ("i" dired-number-of-marked-files "Info")
+    ("S" (progn (funcall-interactively 'hydra-dired-quick-sort/body) (define-key hydra-dired-quick-sort/keymap "q" 'pm-hydra-dired/body)) "Sort" :color blue)
     ("D" dired-hide-details-mode "Details")
+    ("w" (progn (pm-hydra-view/body) (pm-hydra-push '(pm-hydra-dired/body))) "Window/view settings" :color blue)
     )
    ))
+
+(defun pm-hydra--dired-isearch-end-hook ()
+  (when (not (bound-and-true-p isearch-mode))
+    (remove-hook 'dired-isearch-filenames-mode-hook #'pm-hydra--dired-isearch-end-hook t)
+    (when (derived-mode-p 'dired-mode)
+      (pm-hydra-dired/body))))
 
 ;;;;; IBuffer
 (defhydra pm-hydra-ibuffer-main (:color pink :hint nil)
@@ -1606,7 +1620,7 @@ Links in archived branches are ignored. A link tagged with \"_notes\" is set as 
   (setq org-agenda-files nil)
   (async-start
    `(lambda ()
-      ,(async-inject-variables "\\(.*-agenda-file.*\\)\\|\\(load-path\\)")
+      ,(async-inject-variables "\\(.*-agenda-file.*\\)\\|\\(org-archive-tag\\)\\|\\(load-path\\)")
       (when pm-agenda-files-root
         (require 'pm-agenda-files-loader)
         (pm--load-agenda-files-from-file pm-agenda-files-root))
@@ -1615,7 +1629,8 @@ Links in archived branches are ignored. A link tagged with \"_notes\" is set as 
       (if (or (not files) (< (length files) 3))
           (lwarn 'PM :warning "No agenda files loaded from file %s." pm-agenda-files-root)
         (when (car files)
-          (setq org-default-notes-file (car files)))
+          (setq org-default-notes-file (car files))
+          (message "Notes file set: %s" org-default-notes-file))
         (set-register ?n (cons 'file  org-default-notes-file))
         (setq org-agenda-files (cdr files))
         (message "Loaded %s agenda files." (length org-agenda-files)))
@@ -2154,7 +2169,7 @@ Example:
 
 (defun pm-assured-valid-project-id-type (id)
   (or (pm-project-id-type id)
-      (user-error "XXX No valid project ID: %s" id)))
+      (user-error "No valid project ID: %s" id)))
 
 (defun pm-project-file (id)
   (let ((fun (nth 1 (pm-project-id-type id))))
@@ -2808,7 +2823,6 @@ The web hook ID can be specified as link, or is otherwise taken from the propert
                                           (setq result data)
                                           (message "Request succeeded."))))
       :error (or error (cl-function (lambda (&key error-thrown &allow-other-keys)
-                                      (message "XXX1 %s" error-thrown)
                                       (condition-case nil
                                           (when (eq 401 (caddr error-thrown))
                                             (setq pm-jira--session nil))
