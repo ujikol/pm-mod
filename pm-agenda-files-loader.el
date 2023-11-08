@@ -4,6 +4,8 @@
 
 (defun pm--load-agenda-files-from-file (file &optional referrer)
   "Load agenda files recursively from a root org file."
+  ;; async-inject-variables not working for org-archive-tag ???
+  (setq org-archive-tag "_archive")
   (lwarn 'PM :info "Adding agenda file %s referred in %s." file referrer)
   (unless (-contains? org-agenda-files file)
     (if (not (f-exists? file))
