@@ -3185,6 +3185,25 @@ The value of the `Links' field specify other issues to which the new issue will 
 
 ;;;;; C-Return
 
+(defun pm-jump-to-first-match-code-definition (mc)
+  "Jump to first appearance of match code (@xxx) definition (@xxx@) within buffer."
+  (let ((destination
+         (save-excursion
+           (widen)
+           (goto-char 1)
+           (if (search-forward (concat link "@") nil t)
+               (point)))))
+    (if destination
+        (progn
+          (unless (and (<= (point-min) destination)
+                       (>= (point-max) destination))
+            (widen))
+          (org-mark-ring-push)
+          (goto-char destination)
+          (when (or (org-invisible-p) (org-invisible-p2)) (org-fold-show-context 'mark-goto))
+          t)
+      nil)))
+
 (defun pm-before-ctrl-c-ctrl-c ()
   (cond
    ;; show people directory entry if on @xxx
@@ -3194,21 +3213,8 @@ The value of the `Links' field specify other issues to which the new issue will 
         (swiper-isearch (concat (match-string 1 link) "\\b"))
         t)
        ((and link (string-match-p "\\b@[[:alnum:]]+\\((.*\\)?" link))
-        (let ((destination
-               (save-excursion
-                 (widen)
-                 (goto-char 1)
-                 (if (search-forward (concat link "@") nil t)
-                     (point)))))
-          (if destination
-              (progn
-                (unless (and (<= (point-min) destination)
-                             (>= (point-max) destination))
-                  (widen))
-                (org-mark-ring-push)
-                (goto-char destination)
-                (when (or (org-invisible-p) (org-invisible-p2)) (org-fold-show-context 'mark-goto)))
-            (user-error "Person not found." link)))
+        (unless (pm-jump-to-first-match-code-definition link)
+          (user-error "Person not found." link))
         t))))
    ;; generate task juggler reports
    ((let ((tags (org-entry-get nil "ALLTAGS")))
