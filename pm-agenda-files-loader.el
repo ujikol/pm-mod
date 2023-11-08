@@ -22,7 +22,7 @@
                          (s-equals? type "pj"))
                  (let ((tags (pm--collect-ancestors-tags el))
                        (path (pm-path (org-element-property :path el))))
-                   (when (not (-contains? tags org-archive-tag))
+                   (unless (-contains? tags org-archive-tag)
                      (cond
                       ((s-equals? type "pj")
                        (condition-case err
