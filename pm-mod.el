@@ -1083,9 +1083,9 @@ You should install the font Iosevka Term for a nicer appearance:
     )
    "Clipboard"
    (
-    ("x" (progn (call-interactively 'cua-cut-region) (deactivate-mark)) "cut region (C-x)")
-    ("c" (progn (call-interactively 'cua-copy-region) (deactivate-mark)) "copy region (C-c)")
-    ("C" (when (derived-mode-p 'org-mode) (call-interactively 'ox-clip-formatted-copy) (deactivate-mark)) "copy region (C-c)")
+    ("x" (progn (call-interactively 'cua-cut-region) (deactivate-mark)) "cut(C-x)" :color red)
+    ("c" (progn (call-interactively 'cua-copy-region) (deactivate-mark)) "copy (C-c)" :color red)
+    ("C" (when (derived-mode-p 'org-mode) (call-interactively 'ox-clip-formatted-copy) (deactivate-mark)) "copy formatted (C-M-c)" :color red)
     ("v" cua-paste "paste (C-v)")
     ("V" browse-kill-ring "paste selectively (S-C-v)")
     )
