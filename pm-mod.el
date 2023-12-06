@@ -321,7 +321,7 @@ If nil org-agenda-files are handled the normal org-way.")
     (add-hook 'org-agenda-mode-hook (lambda () (hl-line-mode 1)))
     (add-hook 'org-agenda-finalize-hook (lambda () (remove-text-properties (point-min) (point-max) '(mouse-face t))))
     (add-hook 'org-finalize-agenda-hook '(set-face-attribute 'foo nil :weight 'bold :slant 'italic))
-    (setq org-agenda-format-date 'my-org-agenda-format-date-aligned)
+    (setq org-agenda-format-date 'pm-org-agenda-format-date-aligned)
     (setq org-agenda-start-on-weekday 1)
     (setq calendar-week-start-day 1)
 
@@ -1685,8 +1685,9 @@ Links in archived branches are ignored. A link tagged with \"_notes\" is set as 
         (concat prefix (substring deadline 5)))
     (error "      ")))
 
-(defun my-org-agenda-format-date-aligned (date)                                                                                                                  "Format a DATE string for display in the daily/weekly agenda, or timeline.
-  This function makes sure that dates are aligned for easy reading."
+(defun pm-org-agenda-format-date-aligned (date)
+  "Format a DATE string for display in the daily/weekly agenda, or timeline.
+This function makes sure that dates are aligned for easy reading."
        (require 'cal-iso)
        (let* ((dayname (calendar-day-name date 1 nil))
               (day (cadr date))
