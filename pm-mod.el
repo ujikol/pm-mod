@@ -285,6 +285,7 @@ If nil org-agenda-files are handled the normal org-way.")
 
     (when pm-mnemonic-key-bindings
       (global-set-key (kbd "C-n") 'pm-capture)
+      (global-set-key (kbd "C-N") 'org-capture-goto-last-stored)
       (with-eval-after-load "org-capture"
         (define-key org-capture-mode-map (kbd "C-c C-c") nil)
         (define-key org-capture-mode-map (kbd "<C-return>") 'org-capture-finalize)
@@ -930,6 +931,7 @@ You should install the font Iosevka Term for a nicer appearance:
     ("j" jump-to-register "Jump to favorite file (C-j)")
     ("B" org-mark-ring-push "store Bookmark (M-b)")
     ("b" org-mark-ring-goto "jump to Bookmark (C-b)")
+    ("N" org-capture-goto-last-stored "jump to last capture (C-N)")
     ("L" org-store-link "store Link (M-l)")
     ("l" org-insert-link "insert/edit Link (C-l)")
     ("<return>" pm-return "follow Link (Return)")
