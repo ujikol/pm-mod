@@ -285,7 +285,7 @@ If nil org-agenda-files are handled the normal org-way.")
 
     (when pm-mnemonic-key-bindings
       (global-set-key (kbd "C-n") 'pm-capture)
-      (global-set-key (kbd "C-N") 'org-capture-goto-last-stored)
+      (global-set-key (kbd "S-C-n") 'org-capture-goto-last-stored)
       (with-eval-after-load "org-capture"
         (define-key org-capture-mode-map (kbd "C-c C-c") nil)
         (define-key org-capture-mode-map (kbd "<C-return>") 'org-capture-finalize)
