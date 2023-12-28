@@ -2934,6 +2934,8 @@ Both success and error funktion need to accept one parameter: KEY of created iss
                                            (message "Ticket creation failed:%s" (cdr error-thrown)))))
     (list key failed-links)))
 
+(require 'org-ml)
+
 (defun pm-jira-create-ticket-from-branch (link)
   "Create a Jira issue based on the contents of the org heading at point.
 The first word of link specifies the project key, the rest the name of the issuetype.
