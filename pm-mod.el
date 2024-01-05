@@ -1044,12 +1044,16 @@ You should install the font Iosevka Term for a nicer appearance:
    (
     ("c" (when (derived-mode-p 'org-mode) (call-interactively 'org-todo)) "Change status (C-t c)")
     ("i" (when (derived-mode-p 'org-mode) (call-interactively 'pm-convert-inlinetask)) "Inline task (C-t i)")
+    ("p" (when (derived-mode-p 'org-mode) (call-interactively 'org-priority)) "Priority (C-t p)")
+    ("a" (when (derived-mode-p 'org-mode) (pm-set-tags t)) "Assign (C-t t)")
+    ("t" (when (derived-mode-p 'org-mode) (pm-set-tags)) "Tag (C-t t)")
+    )
+   ""
+   (
     ("s" (when (derived-mode-p 'org-mode) (call-interactively 'org-schedule)) "Schedule (C-t s)")
     ("S" (when (derived-mode-p 'org-mode) (call-interactively 'pm-schedule-remove)) "clear Schedule (C-t S)")
     ("d" (when (derived-mode-p 'org-mode) (call-interactively 'org-deadline)) "Deadline (C-t d)")
     ("D" (when (derived-mode-p 'org-mode) (call-interactively 'pm-deadline-remove)) "clear Deadline (C-t D)")
-    ("p" (when (derived-mode-p 'org-mode) (call-interactively 'org-priority)) "Priority (C-t p)")
-    ("a" (when (derived-mode-p 'org-mode) (pm-set-tags t)) "Assign (C-t t)")
     )
    ))
 
