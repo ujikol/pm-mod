@@ -2388,6 +2388,7 @@ End Sub
 
 
 Function getItemTitle(objItem As Object)
+    Dim itemTitle as String
     If Application.ActiveExplorer.Selection.Count <> 1 Then
         MsgBox (\"Select one and only one item.\")
         Exit Function
