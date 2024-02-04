@@ -3200,7 +3200,7 @@ The value of the `Links' field specify other issues to which the new issue will 
 
 ;;;;; C-Return
 
-(defun pm-jump-to-first-match-code-definition (mc)
+(defun pm-jump-to-first-match-code-definition (link)
   "Jump to first appearance of match code (@xxx) definition (@xxx@) within buffer."
   (let ((destination
          (save-excursion
