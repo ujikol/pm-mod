@@ -1199,12 +1199,13 @@ You should install the font Iosevka Term for a nicer appearance:
     ("c" dired-do-copy "Copy")
     ("d" dired-do-delete "Delete")
     ("z" dired-do-compress "compress")
+    ("n" find-file "New file" :color blue)
     ("s" dired-create-directory "create Subdir")
     )
    "Open"
    (
     ("<return>" dired-find-file "open" :color blue)
-    ("C-<return>" browse-url-of-dired-file "open externally" :color blue)
+    ("C-<return>" browse-url-of-dired-file "open externally")
     ("o" dired-find-file-other-window "Open in other window" :color blue)
     ("v" dired-view-file "View" :color blue)
     ("R" revert-buffer "Refresh")
