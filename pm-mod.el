@@ -3267,6 +3267,8 @@ The value of the `Links' field specify other issues to which the new issue will 
           (let ((org-link-frame-setup (copy-alist org-link-frame-setup)))
             (setf (alist-get 'file org-link-frame-setup) 'find-file-other-window)
             (org-open-at-point args)))
+         ((eq 'src-block (org-element-type context))
+          (org-babel-remove-result))
       (t (org-insert-todo-heading-respect-content)))))
 
 ;;;;; M-Return
