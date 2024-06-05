@@ -39,3 +39,9 @@
                        (--map (pm--load-agenda-files-from-file it referrer) (f-files path (lambda (f) (s-suffix? ".org" f)) t)))))))))))))))
 
 (provide 'pm-agenda-files-loader)
+
+;;(require 'pm-agenda-files-loader)
+;;(setq org-agenda-files nil)
+;;(pm--load-agenda-files-from-file pm-agenda-files-root)
+;;(length org-agenda-files)
+

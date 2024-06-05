@@ -1625,25 +1625,34 @@ To avoid this just redefine this function as:
 Links in archived branches are ignored. A link tagged with \"_notes\" is set as org-default-notes-file."
   (interactive)
   (setq org-agenda-files nil)
-  (async-start
-   `(lambda ()
-      ,(async-inject-variables "\\(.*-agenda-file.*\\)\\|\\(org-archive-tag\\)\\|\\(load-path\\)")
-      (when pm-agenda-files-root
-        (require 'pm-agenda-files-loader)
-        (pm--load-agenda-files-from-file pm-agenda-files-root))
-      (cons org-default-notes-file org-agenda-files))
-   `(lambda (files)
-      (if (or (not files) (< (length files) 3))
-          (lwarn 'PM :warning "No agenda files loaded from file %s." pm-agenda-files-root)
-        (when (car files)
-          (setq org-default-notes-file (car files))
-          (message "Notes file set: %s" org-default-notes-file))
-        (set-register ?n (cons 'file  org-default-notes-file))
-        (setq org-agenda-files (cdr files))
-        (message "Loaded %s agenda files." (length org-agenda-files)))
-      (let ((inhibit-debugger t))
-        (customize-save-variable 'org-agenda-files org-agenda-files)))))
-
+  ;; Could not get async loading working reliably. ???
+  ;;(async-start
+  ;; `(lambda ()
+  ;;    ,(async-inject-variables "\\(.*-agenda-file.*\\)\\|\\(org-archive-tag\\)\\|\\(load-path\\)")
+  ;;    (when pm-agenda-files-root
+  ;;      (require 'pm-agenda-files-loader)
+  ;;      (pm--load-agenda-files-from-file pm-agenda-files-root))
+  ;;    (cons org-default-notes-file org-agenda-files))
+  ;; `(lambda (files)
+  ;;    (if (or (not files) (< (length files) 3))
+  ;;        (lwarn 'PM :warning "No agenda files loaded from file %s." pm-agenda-files-root)
+  ;;      (when (car files)
+  ;;        (setq org-default-notes-file (car files))
+  ;;        (message "Notes file set: %s" org-default-notes-file))
+  ;;      (set-register ?n (cons 'file  org-default-notes-file))
+  ;;      (setq org-agenda-files (cdr files))
+  (when pm-agenda-files-root
+    (require 'pm-agenda-files-loader)
+    (pm--load-agenda-files-from-file pm-agenda-files-root)
+    (if (or (not pm-agenda-files-root) (< (length pm-agenda-files-root) 2))
+        (lwarn 'PM :warning "No agenda files loaded from file %s." pm-agenda-files-root))
+    (message "Notes file set: %s" org-default-notes-file)
+    (set-register ?n (cons 'file  org-default-notes-file))
+    (message "Loaded %s agenda files." (length org-agenda-files))
+    (let ((inhibit-debugger t))
+      (customize-save-variable 'org-agenda-files org-agenda-files))))
+;;(pm-load-agenda-files)
+;;(length org-agenda-files)
 ;;;;; Agenda definitions
 (defun pm-entry-get-actors ()
   (--map (substring-no-properties it)
