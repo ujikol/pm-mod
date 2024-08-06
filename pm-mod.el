@@ -2270,18 +2270,24 @@ org-protocol://pm:/path=c:/path/file.org&search=*Heading"
   (unless pm--tryrun-powershell
     (setq code (s-join ";" (--filter (not (s-prefix? "#" it)) (s-split "\n" code)))))
   (setq code (apply #'format (push code inserts)))
-  (if pm--tryrun-powershell
-      (and (message "This code would be run in Powershell:\n%s" code) (messages-buffer))
-    (if watch
-        (let ((buf (get-buffer-create "*PowerShell Output*")))
-          (with-current-buffer-window buf nil nil
-            (call-process "powershell.exe" nil "*PowerShell Output*" t code))
+    (let ((file (and (> (length code) 8000)
+                     (make-temp-file "temp" nil ".ps1" code)))
           buf)
-      (if (< (length code) 8000)
-          (shell-command-to-string (concat "powershell.exe -Command \"" code "\""))
-        (let ((file (make-temp-file "temp" nil ".ps1" code)))
-          (shell-command-to-string (concat "powershell.exe -file \"" file "\""))
-          (f-delete file))))))
+      (if (or watch pm--tryrun-powershell)
+          (progn
+            (setq buf (get-buffer-create "*PowerShell Output*"))
+            (with-current-buffer-window buf nil nil
+              (if pm--tryrun-powershell
+                  (insert (format "This code would be run in Powershell:\n%s" code))
+                (if file
+                    (call-process "powershell.exe" nil "*PowerShell Output*" t "-file" file)
+                  (call-process "powershell.exe" nil "*PowerShell Output*" t code)))))
+        (if file
+            (shell-command-to-string (concat "powershell.exe -file \"" file "\""))
+          (shell-command-to-string (concat "powershell.exe -Command \"" code "\""))))
+      (if file
+          (f-delete file))
+      buf))
 
 (defun pm-run-in-powershell-as-admin(code &rest inserts)
   (setq code (concat "
@@ -2521,13 +2527,14 @@ OPTIONS is a list of strings holding option name without prefix '-' and values."
 
 (defun pm--update-users(users role channel)
   "Add&remove owners or members to/from channel."
-  (setq users (if users (s-join ", " (--map (concat "'" it "'") users)) "@()"))
+  (setq users (s-join "\n" (--map (format "$news.Add('%s')" it) users)))
   (setq role (if (and role (s-equals? role "Owner")) (format " -Role '%s'" role) ""))
   (let ((cmdsup (if channel "Channel" ""))
         (idsup (if channel (format " -DisplayName %s" (pm--pssavpar channel)) "")))
     (format "# Update %s users (%s) for %s.
 $olds = (Get-Team%sUser -GroupID $id%s %s).User
-$news = @(%s)
+$news = [System.Collections.ArrayList]@()
+%s
 foreach ($it in $news) { if ($olds -notcontains $it) { Add-Team%sUser -GroupID $id%s -User $it%s } }
 foreach ($it in $olds) { if ($news -notcontains $it) { Remove-Team%sUser -GroupID $id%s -User $it%s } }"
             cmdsup role channel cmdsup idsup role users cmdsup idsup role cmdsup idsup role)))
@@ -2546,8 +2553,8 @@ foreach ($it in $olds) { if ($news -notcontains $it) { Remove-Team%sUser -GroupI
                       (type (upcase (or (cdar type) "STANDARD")))
                       (options (--remove (s-equals? (upcase (car it)) "MEMBERSHIPTYPE") options)))
                  (list
-                  (pm--pssavpar name)
-                  (format "%s = '%s'" (pm--pssavpar name) type)
+                  (format "$news.Add(%s)" (pm--pssavpar name))
+                  (format "$types.Add(%s, '%s')" (pm--pssavpar name) type)
                   (s-join "\n" (-non-nil (list
                                           (pm--update-options options name)
                                           (unless (s-equals? type "STANDARD")
@@ -2556,11 +2563,13 @@ foreach ($it in $olds) { if ($news -notcontains $it) { Remove-Team%sUser -GroupI
                                             (pm--update-users owners "Owner" name)))))))
                channels))))
         (format "$olds = (Get-TeamChannel -GroupID $Id).DisplayName
-$news = @(%s)
-$types = @{%s}
+$news = [System.Collections.ArrayList]@()
+%s
+$types = @{}
+%s
 foreach ($it in $news) { if ($olds -notcontains $it) { New-TeamChannel -GroupID $id -DisplayName $it -MembershipType $types[$it]} }
 %s"
-                (s-join ", " (nth 0 data)) (s-join "; " (nth 1 data)) (s-join "\n" (nth 2 data))))))
+                (s-join "\n" (nth 0 data)) (s-join "\n" (nth 1 data)) (s-join "\n" (nth 2 data))))))
 
 (defconst pm-msteams-properties
   '("MST_T_DisplayName" nil
@@ -2602,30 +2611,31 @@ foreach ($it in $news) { if ($olds -notcontains $it) { New-TeamChannel -GroupID 
          it)))))
 
 (defun pm-msteams-setup-team-with-structure (link)
-  (org-with-wide-buffer
-   (org-narrow-to-subtree)
-   (goto-char (point-min))
-   (let* ((groupid (org-entry-get (point) "MST_Id"))
-          (text (buffer-substring-no-properties (point-min) (point-max)))
-;;          (parse-buf (get-buffer-create "*Parse Buffer*"))
-          (team (caddr 
-;;                 (with-current-buffer parse-buf
-;;                   (org-mode)
-;;                   (insert text)
-                 (org-element-parse-buffer 'object)))
-;;          )
-          (options (pm--msteams-extract-options-from-structure team ":MST_T_"))
-          owners members channels)
-     (--map
-      (let ((text (org-element-property :raw-value it)))
-        (cond
-         ((s-equals? text "Owners") (setq owners (pm--msteams-extract-users-from-structure it)))
-         ((s-equals? text "Members") (setq members (pm--msteams-extract-users-from-structure it)))
-         ((s-equals? text "Channels") (setq channels (pm--msteams-extract-channels-from-structure it)))))
-      (pm-element-get-children team 'headline))
-;;     (kill-buffer parse-buf)
-     (setq groupid (pm-msteams-setup-team groupid options owners members channels))
-     (org-set-property "MST_Id" groupid))))
+  (save-excursion
+    (org-with-wide-buffer
+     (org-narrow-to-subtree)
+     (goto-char (point-min))
+     (let* ((groupid (org-entry-get (point) "MST_Id"))
+            (text (buffer-substring-no-properties (point-min) (point-max)))
+            ;;          (parse-buf (get-buffer-create "*Parse Buffer*"))
+            (team (caddr 
+                   ;;                 (with-current-buffer parse-buf
+                   ;;                   (org-mode)
+                   ;;                   (insert text)
+                   (org-element-parse-buffer 'object)))
+            ;;          )
+            (options (pm--msteams-extract-options-from-structure team ":MST_T_"))
+            owners members channels)
+       (--map
+        (let ((text (org-element-property :raw-value it)))
+          (cond
+           ((s-equals? text "Owners") (setq owners (pm--msteams-extract-users-from-structure it)))
+           ((s-equals? text "Members") (setq members (pm--msteams-extract-users-from-structure it)))
+           ((s-equals? text "Channels") (setq channels (pm--msteams-extract-channels-from-structure it)))))
+        (pm-element-get-children team 'headline))
+       ;;     (kill-buffer parse-buf)
+       (setq groupid (pm-msteams-setup-team groupid options owners members channels))
+       (org-set-property "MST_Id" groupid)))))
 
 (defun pm--msteams-extract-options-from-structure (node prefix)
   (--map (cons
